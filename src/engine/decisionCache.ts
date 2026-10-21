@@ -1,4 +1,5 @@
 import type { DecisionCacheRecord, SubstitutionDecision } from '../types/lexicon'
+import { isBogusSubstitute } from './simplify'
 
 const STORAGE_KEY = 'lectura-fiel:decision-cache'
 
@@ -66,7 +67,18 @@ export class DecisionCache {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return
       const parsed = JSON.parse(raw) as DecisionCacheRecord[]
-      for (const r of parsed) this.map.set(r.lemma, r)
+      let scrubbed = false
+      for (const r of parsed) {
+        if (
+          r.decision === 'substitute' &&
+          isBogusSubstitute(r.substitute ?? null)
+        ) {
+          scrubbed = true
+          continue
+        }
+        this.map.set(r.lemma, r)
+      }
+      if (scrubbed) this.persist()
     } catch {
       /* ignore corrupt cache */
     }

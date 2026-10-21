@@ -34,16 +34,33 @@ const EASY_MAP: Record<string, string> = {
   'por eso': 'por eso',
 }
 
+/** Sustitutos basura (p. ej. caché vieja del modo Simple + rareza). */
+export function isBogusSubstitute(value: string | null | undefined): boolean {
+  if (value == null) return true
+  const t = value.trim().toLowerCase()
+  if (!t) return true
+  return (
+    t.includes('palabra poco frecuente') ||
+    t.includes('detección por rareza') ||
+    t.includes('conviene confirmar')
+  )
+}
+
 /**
  * Elige el reemplazo según el modo.
  * En modo simple (preferSimplest): simpleSubstitute → mapa fácil → sintetizar definición.
+ * Nunca inventa sustituto para entradas sintéticas (rareza).
  */
 export function pickSubstitute(
   entry: LexiconEntry,
   preferSimplest: boolean,
   override?: string | null,
 ): string | null {
-  if (override != null && override !== undefined) return override
+  if (entry.synthetic) return null
+
+  if (override != null && override !== undefined) {
+    return isBogusSubstitute(override) ? null : override
+  }
 
   if (!preferSimplest) {
     return entry.preferredSubstitute ?? null
@@ -60,7 +77,8 @@ export function pickSubstitute(
     return shortenPhrase(preferred)
   }
 
-  return synthesizeFromDefinition(entry.definition)
+  // Sin sinónimo curado: no fabricar texto desde la definición genérica
+  return null
 }
 
 /** Acorta una frase a algo más cotidiano si es larga. */

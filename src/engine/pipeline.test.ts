@@ -91,6 +91,27 @@ describe('modo 4 simple', () => {
     expect(lower).not.toContain('melancolía')
     expect(lower).not.toContain('empero')
   })
+
+  it('no reemplaza rareza por «palabra poco frecuente»', () => {
+    const result = runPipeline(
+      'El camino era largo y apareció un hipogrifo entre las rocas.',
+      {
+        chapter: 1,
+        intervention: {
+          modeId: '4',
+          minLevel: 1,
+          includeRarity: true,
+          forceSubstitute: true,
+          preferSimplest: true,
+          includeLiterary: true,
+        },
+      },
+    )
+    expect(result.adaptedText.toLowerCase()).not.toContain(
+      'palabra poco frecuente',
+    )
+    expect(result.adaptedText.toLowerCase()).toContain('hipogrifo')
+  })
 })
 
 describe('runPipeline', () => {

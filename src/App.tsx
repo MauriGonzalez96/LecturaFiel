@@ -22,7 +22,7 @@ import { DEMO_ENABLED } from './env'
 import type { IngestedBook } from './ingest/types'
 import { APP_VERSION_LABEL } from './version'
 
-type Tab = 'adapted' | 'original' | 'glossary' | 'review' | 'voices'
+type Tab = 'read' | 'glossary' | 'review' | 'voices'
 
 export default function App() {
   const library = useLibrary()
@@ -31,9 +31,10 @@ export default function App() {
   useVoiceSettings()
   const [demoMode, setDemoMode] = useState(DEMO_ENABLED)
   const [demoText, setDemoText] = useState(SAMPLE_CHAPTER.text)
-  const [tab, setTab] = useState<Tab>('adapted')
+  const [tab, setTab] = useState<Tab>('read')
   const [cacheTick, setCacheTick] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [seekNonce, setSeekNonce] = useState(0)
 
   const showDemo = DEMO_ENABLED && demoMode
   const active = !showDemo ? library.activeSlot : null
@@ -110,7 +111,7 @@ export default function App() {
     if (library.isBookOpen(next.id)) {
       library.addOrOpenBook(next)
       setDemoMode(false)
-      setTab('adapted')
+      setTab('read')
       return
     }
 
@@ -123,13 +124,13 @@ export default function App() {
 
     library.addOrOpenBook(next)
     setDemoMode(false)
-    setTab('adapted')
+    setTab('read')
   }
 
   function selectChapter(index: number) {
     if (!book) return
     library.setChapterIndex(book.id, index)
-    setTab('adapted')
+    setTab('read')
   }
 
   const hasNextChapter = Boolean(
@@ -149,7 +150,7 @@ export default function App() {
     if (!book || showDemo) return false
     if (chapterIndex >= book.chapters.length - 1) return false
     library.setChapterIndex(book.id, chapterIndex + 1)
-    setTab('adapted')
+    setTab('read')
     return true
   }
 
@@ -167,18 +168,32 @@ export default function App() {
     [book, showDemo, setSentenceIndex],
   )
 
+  const placeCursor = useCallback(
+    (index: number) => {
+      if (showDemo) return
+      if (!book) return
+      if (sentenceSaveTimer.current != null) {
+        window.clearTimeout(sentenceSaveTimer.current)
+        sentenceSaveTimer.current = null
+      }
+      setSentenceIndex(book.id, index)
+      setSeekNonce((n) => n + 1)
+    },
+    [book, showDemo, setSentenceIndex],
+  )
+
   function goDemo() {
     if (!DEMO_ENABLED) return
     library.setActiveBook(null)
     setDemoMode(true)
     setDemoText(SAMPLE_CHAPTER.text)
-    setTab('adapted')
+    setTab('read')
   }
 
   function selectLibraryBook(bookId: string) {
     library.setActiveBook(bookId)
     setDemoMode(false)
-    setTab('adapted')
+    setTab('read')
     setUploadError(null)
   }
 
@@ -324,8 +339,7 @@ export default function App() {
             <div className="tabs" role="tablist">
               {(
                 [
-                  ['adapted', 'Adaptado'],
-                  ['original', 'Original'],
+                  ['read', 'Texto'],
                   ['glossary', `Glosario (${glossaryTabCount})`],
                   ['review', 'Repaso'],
                 ] as const
@@ -345,7 +359,7 @@ export default function App() {
           </div>
 
           {tab === 'voices' ? (
-            <VoiceStudio onClose={() => setTab('adapted')} />
+            <VoiceStudio onClose={() => setTab('read')} />
           ) : emptyProduction && tab !== 'glossary' ? (
             <p className="empty-panel">
               Cuando cargues un libro vas a ver el texto adaptado, el glosario y
@@ -382,6 +396,7 @@ export default function App() {
                     onSentenceProgress={
                       showDemo ? undefined : saveSentenceProgress
                     }
+                    seekNonce={seekNonce}
                   />
                 </>
               )}
@@ -404,11 +419,8 @@ export default function App() {
                 ) : (
                   <HighlightedText
                     result={result}
-                    mode={tab === 'adapted' ? 'adapted' : 'original'}
                     activeSentenceIndex={showDemo ? 0 : sentenceIndex}
-                    onSentenceVisible={
-                      showDemo ? undefined : saveSentenceProgress
-                    }
+                    onPlaceCursor={showDemo ? undefined : placeCursor}
                   />
                 )}
               </div>

@@ -22,6 +22,8 @@ interface Props {
   resumeSentenceIndex?: number
   /** Persistir oración actual (audio / pausa). */
   onSentenceProgress?: (sentenceIndex: number) => void
+  /** Incrementa al colocar el cursor a mano → si hay audio, salta ahí. */
+  seekNonce?: number
 }
 
 type Source = 'adapted' | 'original'
@@ -50,6 +52,7 @@ export function AudioPlayer({
   onOpenVoices,
   resumeSentenceIndex = 0,
   onSentenceProgress,
+  seekNonce = 0,
 }: Props) {
   const { status, speak, stop, pause, resume } = useSpeech()
   const { rate, setRate } = useSpeechRate()
@@ -122,6 +125,27 @@ export function AudioPlayer({
       onComplete: onPlaybackComplete,
     })
   }, [chapterKey, adaptedText, originalText])
+
+  const prevSeekRef = useRef(seekNonce)
+  useEffect(() => {
+    if (seekNonce === prevSeekRef.current) return
+    prevSeekRef.current = seekNonce
+    if (seekNonce === 0) return
+    // Solo saltar si ya había reproducción en curso / pausa
+    if (status !== 'speaking' && status !== 'paused' && status !== 'loading') {
+      return
+    }
+    const text =
+      sourceRef.current === 'adapted'
+        ? adaptedRef.current
+        : originalRef.current
+    if (!text.trim()) return
+    void speakRef.current(text, {
+      startSentenceIndex: Math.max(0, resumeIdxRef.current),
+      onSentence: reportSentence,
+      onComplete: onPlaybackComplete,
+    })
+  }, [seekNonce, status])
 
   function acceptContinue() {
     setPrompt(null)

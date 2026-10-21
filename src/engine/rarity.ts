@@ -18,7 +18,9 @@ export function rarityEntry(normalized: string): LexiconEntry {
     definition:
       'Palabra poco frecuente en el uso cotidiano (detección por rareza). Conservada en el texto; conviene confirmar el sentido en contexto.',
     preferredSubstitute: null,
+    simpleSubstitute: null,
     defaultDecision: 'glossary_only',
+    synthetic: true,
     notes: 'Candidata por frecuencias de referencia, no por léxico semilla.',
   }
 }

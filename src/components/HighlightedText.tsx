@@ -1,107 +1,77 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { sentenceSpans } from '../engine/sentences'
 import { tokenize } from '../engine/tokenizer'
 import type { PipelineResult, TextToken } from '../types/lexicon'
 
 interface Props {
   result: PipelineResult
-  mode: 'original' | 'adapted'
-  /** Oración activa (progreso guardado / audio). */
+  /** Oración activa (progreso / audio). */
   activeSentenceIndex?: number
-  onSentenceVisible?: (index: number) => void
+  /** Clic en una oración → colocar cursor de lectura. */
+  onPlaceCursor?: (sentenceIndex: number) => void
 }
 
-/** Resalta sustituciones y la oración donde quedó la lectura. */
+/**
+ * Texto original | adaptado, con cursor de lectura colocable.
+ */
 export function HighlightedText({
   result,
-  mode,
   activeSentenceIndex = 0,
-  onSentenceVisible,
+  onPlaceCursor,
 }: Props) {
-  const sourceText =
-    mode === 'adapted' ? result.adaptedText : result.originalText
-  // El progreso se guarda sobre el texto adaptado (audio por defecto);
-  // en original usamos el mismo índice (suele alinear por oración).
-  const spans = sentenceSpans(
-    mode === 'adapted' ? result.adaptedText : result.originalText,
-  )
-  const activeRef = useRef<HTMLElement | null>(null)
+  const leftRef = useRef<HTMLButtonElement | null>(null)
+  const rightRef = useRef<HTMLButtonElement | null>(null)
+  const originalSpans = sentenceSpans(result.originalText)
+  const adaptedSpans = sentenceSpans(result.adaptedText)
 
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [activeSentenceIndex, sourceText])
-
-  useEffect(() => {
-    if (!onSentenceVisible || spans.length === 0) return
-    const root = document.querySelector('.result-body')
-    const nodes = (root ?? document).querySelectorAll<HTMLElement>(
-      '[data-sentence]',
-    )
-    if (!nodes.length) return
-
-    const ratios = new Map<number, number>()
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const i = Number((entry.target as HTMLElement).dataset.sentence)
-          if (Number.isFinite(i)) {
-            ratios.set(i, entry.isIntersecting ? entry.intersectionRatio : 0)
-          }
-        }
-        let best = -1
-        let bestRatio = 0.15
-        for (const [i, r] of ratios) {
-          if (r > bestRatio) {
-            bestRatio = r
-            best = i
-          }
-        }
-        if (best >= 0) onSentenceVisible(best)
-      },
-      {
-        root: root instanceof Element ? root : null,
-        threshold: [0.2, 0.45, 0.7],
-      },
-    )
-    nodes.forEach((n) => obs.observe(n))
-    return () => obs.disconnect()
-  }, [onSentenceVisible, spans.length, sourceText])
-
-  if (spans.length === 0) {
-    return <p className="reader-prose">{sourceText}</p>
-  }
-
-  if (mode === 'adapted') {
-    return (
-      <AdaptedSentences
-        result={result}
-        spans={spans}
-        activeSentenceIndex={activeSentenceIndex}
-        activeRef={activeRef}
-      />
-    )
-  }
+    const el = rightRef.current ?? leftRef.current
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [activeSentenceIndex, result.adaptedText, result.originalText])
 
   return (
-    <OriginalSentences
-      result={result}
-      spans={spans}
-      activeSentenceIndex={activeSentenceIndex}
-      activeRef={activeRef}
-    />
+    <div className="dual-reader" role="group" aria-label="Original y adaptado">
+      <div className="dual-pane">
+        <header className="dual-pane-head">Original</header>
+        <OriginalColumn
+          result={result}
+          spans={originalSpans}
+          activeSentenceIndex={activeSentenceIndex}
+          activeRef={leftRef}
+          onPlaceCursor={onPlaceCursor}
+        />
+      </div>
+      <div className="dual-pane dual-pane-adapted">
+        <header className="dual-pane-head">
+          Se lee
+          <span className="dual-cursor-hint" title="Clic en una oración para colocar el cursor">
+            · clic = cursor
+          </span>
+        </header>
+        <AdaptedColumn
+          result={result}
+          spans={adaptedSpans}
+          activeSentenceIndex={activeSentenceIndex}
+          activeRef={rightRef}
+          onPlaceCursor={onPlaceCursor}
+        />
+      </div>
+    </div>
   )
 }
 
-function OriginalSentences({
+function OriginalColumn({
   result,
   spans,
   activeSentenceIndex,
   activeRef,
+  onPlaceCursor,
 }: {
   result: PipelineResult
   spans: ReturnType<typeof sentenceSpans>
   activeSentenceIndex: number
-  activeRef: RefObject<HTMLElement | null>
+  activeRef: RefObject<HTMLButtonElement | null>
+  onPlaceCursor?: (i: number) => void
 }) {
   const tokens = tokenize(result.originalText)
   const subIndexes = new Map(
@@ -109,20 +79,25 @@ function OriginalSentences({
   )
   const candIndexes = new Set(result.candidates.map((c) => c.tokenIndex))
 
+  if (spans.length === 0) {
+    return <p className="reader-prose">{result.originalText}</p>
+  }
+
   return (
     <div className="reader-prose">
       {spans.map((span) => (
-        <span
+        <SentenceShell
           key={span.index}
-          ref={span.index === activeSentenceIndex ? activeRef : undefined}
-          data-sentence={span.index}
-          className={sentenceClass(span.index, activeSentenceIndex)}
+          index={span.index}
+          active={span.index === activeSentenceIndex}
+          activeRef={activeRef}
+          onPlaceCursor={onPlaceCursor}
         >
           {tokensInSpan(tokens, span.start, span.end).map(({ token, i }) => {
             if (!token.isWord) return <span key={i}>{token.raw}</span>
             if (subIndexes.has(i)) {
               return (
-                <mark key={i} className="hl hl-sub" title="Se sustituirá">
+                <mark key={i} className="hl hl-sub" title="Se sustituye al leer">
                   {token.raw}
                 </mark>
               )
@@ -135,28 +110,28 @@ function OriginalSentences({
               )
             }
             return <span key={i}>{token.raw}</span>
-          })}{' '}
-        </span>
+          })}
+        </SentenceShell>
       ))}
     </div>
   )
 }
 
-function AdaptedSentences({
+function AdaptedColumn({
   result,
   spans,
   activeSentenceIndex,
   activeRef,
+  onPlaceCursor,
 }: {
   result: PipelineResult
   spans: ReturnType<typeof sentenceSpans>
   activeSentenceIndex: number
-  activeRef: RefObject<HTMLElement | null>
+  activeRef: RefObject<HTMLButtonElement | null>
+  onPlaceCursor?: (i: number) => void
 }) {
-  // Marcas sobre el original, pero el corte de oraciones es del adaptado
-  // (alineado al audio). Dentro de cada oración adaptada resaltamos por lema.
-  const subLemmas = new Map(
-    result.substitutions.map((s) => [s.entry.lemma, s]),
+  const subByReplacement = new Map(
+    result.substitutions.map((s) => [s.replacement.toLowerCase(), s]),
   )
   const glossaryOnly = new Set(
     result.glossary
@@ -164,25 +139,27 @@ function AdaptedSentences({
       .map((g) => g.lemma),
   )
 
+  if (spans.length === 0) {
+    return <p className="reader-prose">{result.adaptedText}</p>
+  }
+
   return (
     <div className="reader-prose">
       {spans.map((span) => {
         const tokens = tokenize(span.text)
         return (
-          <span
+          <SentenceShell
             key={span.index}
-            ref={span.index === activeSentenceIndex ? activeRef : undefined}
-            data-sentence={span.index}
-            className={sentenceClass(span.index, activeSentenceIndex)}
+            index={span.index}
+            active={span.index === activeSentenceIndex}
+            activeRef={activeRef}
+            onPlaceCursor={onPlaceCursor}
+            showCaret
           >
             {tokens.map((token, i) => {
               if (!token.isWord) return <span key={i}>{token.raw}</span>
-              const sub = [...subLemmas.values()].find(
-                (s) =>
-                  s.replacement.toLowerCase() === token.normalized ||
-                  s.original.toLowerCase() === token.normalized,
-              )
-              if (sub && sub.replacement.toLowerCase() === token.normalized) {
+              const sub = subByReplacement.get(token.normalized)
+              if (sub) {
                 return (
                   <mark
                     key={i}
@@ -204,16 +181,51 @@ function AdaptedSentences({
                 )
               }
               return <span key={i}>{token.raw}</span>
-            })}{' '}
-          </span>
+            })}
+          </SentenceShell>
         )
       })}
     </div>
   )
 }
 
-function sentenceClass(index: number, active: number): string {
-  return index === active ? 'reader-sentence is-active' : 'reader-sentence'
+function SentenceShell({
+  index,
+  active,
+  activeRef,
+  onPlaceCursor,
+  showCaret,
+  children,
+}: {
+  index: number
+  active: boolean
+  activeRef: RefObject<HTMLButtonElement | null>
+  onPlaceCursor?: (i: number) => void
+  showCaret?: boolean
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      ref={active ? activeRef : undefined}
+      data-sentence={index}
+      className={
+        active
+          ? 'reader-sentence is-active is-clickable'
+          : 'reader-sentence is-clickable'
+      }
+      onClick={() => onPlaceCursor?.(index)}
+      title={`Colocar cursor en la oración ${index + 1}`}
+      aria-current={active ? 'true' : undefined}
+    >
+      {showCaret && active ? (
+        <span className="reader-caret" aria-hidden="true">
+          ▶
+        </span>
+      ) : null}
+      {children}{' '}
+    </button>
+  )
 }
 
 function tokensInSpan(

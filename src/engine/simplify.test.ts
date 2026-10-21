@@ -50,4 +50,33 @@ describe('simplify', () => {
       ),
     ).toBe('sin embargo')
   })
+
+  it('no inventa sustituto sin sinónimo curado', () => {
+    expect(
+      pickSubstitute(entry({ preferredSubstitute: null, simpleSubstitute: null }), true),
+    ).toBeNull()
+  })
+
+  it('no sustituye entradas sintéticas (rareza)', () => {
+    expect(
+      pickSubstitute(
+        entry({
+          synthetic: true,
+          preferredSubstitute: null,
+          definition: 'Palabra poco frecuente en el uso cotidiano.',
+        }),
+        true,
+      ),
+    ).toBeNull()
+  })
+
+  it('rechaza sustitutos basura de caché', () => {
+    expect(
+      pickSubstitute(
+        entry({ preferredSubstitute: 'pero' }),
+        true,
+        'palabra poco frecuente',
+      ),
+    ).toBeNull()
+  })
 })

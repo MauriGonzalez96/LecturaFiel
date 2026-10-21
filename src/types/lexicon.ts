@@ -35,6 +35,11 @@ export interface LexiconEntry {
   notes?: string
   /** Decisión por defecto tras evaluación contextual. */
   defaultDecision: SubstitutionDecision
+  /**
+   * Entrada inventada (p. ej. rareza automática): nunca sustituir;
+   * solo glosario / conservar la palabra original.
+   */
+  synthetic?: boolean
 }
 
 export interface TextToken {

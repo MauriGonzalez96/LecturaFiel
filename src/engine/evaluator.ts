@@ -39,16 +39,22 @@ export function evaluateCandidate(
   const cached = decisionCache.get(entry.lemma, prev, opts.modeId)
 
   if (cached && cached.decision !== 'evaluate') {
-    return {
-      candidate,
-      decision: cached.decision,
-      substitute: pickSubstitute(
-        entry,
-        opts.preferSimplest,
-        cached.substitute ?? null,
-      ),
-      reason: 'Decisión reutilizada desde caché contextual.',
-      fromCache: true,
+    const sub = pickSubstitute(
+      entry,
+      opts.preferSimplest,
+      cached.substitute ?? null,
+    )
+    // Caché corrupta (modo Simple + rareza) → reevaluar
+    if (cached.decision === 'substitute' && !sub) {
+      /* fall through */
+    } else {
+      return {
+        candidate,
+        decision: cached.decision,
+        substitute: sub,
+        reason: 'Decisión reutilizada desde caché contextual.',
+        fromCache: true,
+      }
     }
   }
 
@@ -105,6 +111,8 @@ function resolveDecision(
   }
 
   if (entry.defaultDecision === 'glossary_only') {
+    // Rareza / sintéticas: nunca sustituir (evita «palabra poco frecuente»)
+    if (entry.synthetic) return 'glossary_only'
     if (opts.forceSubstitute) {
       const easy = pickSubstitute(entry, opts.preferSimplest, null)
       return easy ? 'substitute' : 'glossary_only'
