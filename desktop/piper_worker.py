@@ -54,10 +54,17 @@ def run_worker(job_path: str) -> int:
 
         from piper import PiperVoice
 
+        length_scale = float(job.get("lengthScale") or 1.0)
+        length_scale = max(0.5, min(2.0, length_scale))
+
         voice = PiperVoice.load(str(onnx), espeak_data_dir=str(espeak_dir))
         out.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(out), "wb") as wav_file:
-            voice.synthesize_wav(text, wav_file)
+            # Piper 1.x: length_scale en synthesize_wav si está disponible
+            try:
+                voice.synthesize_wav(text, wav_file, length_scale=length_scale)
+            except TypeError:
+                voice.synthesize_wav(text, wav_file)
         Path(job_path).with_suffix(".ok").write_text("ok", encoding="utf-8")
         return 0
     except Exception:

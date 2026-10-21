@@ -1,57 +1,65 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { openGlossaryWindow } from '../glossary/openGlossaryWindow'
 import type { GlossaryBookRecord } from '../glossary/types'
 import type { GlossaryItem } from '../types/lexicon'
 
 interface Props {
-  /** Entradas del capítulo actual. */
-  chapterItems: GlossaryItem[]
-  /** Entradas acumuladas del libro activo (historial). */
+  /** Entradas acumuladas del libro que se está leyendo. */
   bookItems?: GlossaryItem[]
   bookTitle?: string
-  /** Todos los libros del archivo JSON. */
+  /** Todos los libros del archivo (glosario general). */
   archive?: GlossaryBookRecord[]
+  /** Preferencia inicial: libro actual o general. */
+  initialScope?: Scope
   onDownload?: () => void
   onImportFile?: (file: File) => void | Promise<void>
   onRemoveArchiveBook?: (bookId: string) => void
 }
 
-type Scope = 'chapter' | 'book' | 'archive'
+export type Scope = 'book' | 'general'
 
 export function GlossaryPanel({
-  chapterItems,
   bookItems = [],
   bookTitle,
   archive = [],
+  initialScope = 'book',
   onDownload,
   onImportFile,
   onRemoveArchiveBook,
 }: Props) {
-  const [scope, setScope] = useState<Scope>('chapter')
-  const [archiveBookId, setArchiveBookId] = useState<string>(
-    () => archive[0]?.bookId ?? '',
-  )
+  const [scope, setScope] = useState<Scope>(initialScope)
+  const [popupError, setPopupError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const archiveBook =
-    archive.find((b) => b.bookId === archiveBookId) ?? archive[0]
-  const items =
-    scope === 'chapter'
-      ? chapterItems
-      : scope === 'book'
-        ? bookItems
-        : (archiveBook?.entries ?? [])
+  useEffect(() => {
+    setScope(initialScope)
+  }, [initialScope])
+
+  const generalCount = archive.reduce((n, b) => n + b.entries.length, 0)
+
+  function openAside() {
+    setPopupError(null)
+    const ok = openGlossaryWindow({
+      mode: scope === 'book' ? 'book' : 'general',
+      bookTitle,
+      bookItems,
+      archive,
+    })
+    if (!ok) {
+      setPopupError(
+        'El navegador bloqueó la ventana. Permití ventanas emergentes para Lectura Fiel.',
+      )
+    }
+  }
 
   return (
     <div className="glossary">
       <div className="glossary-toolbar">
-        <div className="glossary-scopes" role="tablist" aria-label="Alcance del glosario">
-          <button
-            type="button"
-            className={scope === 'chapter' ? 'tab active' : 'tab'}
-            onClick={() => setScope('chapter')}
-          >
-            Capítulo ({chapterItems.length})
-          </button>
+        <div
+          className="glossary-scopes"
+          role="tablist"
+          aria-label="Tipo de glosario"
+        >
           <button
             type="button"
             className={scope === 'book' ? 'tab active' : 'tab'}
@@ -61,13 +69,21 @@ export function GlossaryPanel({
           </button>
           <button
             type="button"
-            className={scope === 'archive' ? 'tab active' : 'tab'}
-            onClick={() => setScope('archive')}
+            className={scope === 'general' ? 'tab active' : 'tab'}
+            onClick={() => setScope('general')}
           >
-            Archivo ({archive.length})
+            General ({generalCount})
           </button>
         </div>
         <div className="glossary-actions">
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={openAside}
+            title="Abre el glosario en otra ventana (el audio sigue)"
+          >
+            Abrir en ventana
+          </button>
           {onDownload && (
             <button
               type="button"
@@ -103,80 +119,113 @@ export function GlossaryPanel({
         </div>
       </div>
 
-      {scope === 'book' && bookTitle && (
-        <p className="hint glossary-hint">
-          Acumulado de «{bookTitle}» (se guarda aunque quites el libro de los
-          slots).
+      {popupError && (
+        <p className="upload-error" role="alert">
+          {popupError}
         </p>
       )}
 
-      {scope === 'archive' && (
-        <div className="glossary-archive-pick">
-          {archive.length === 0 ? (
-            <p className="hint">Todavía no hay libros en el archivo de glosario.</p>
-          ) : (
-            <>
-              <label className="chapter-select">
-                Libro
-                <select
-                  value={archiveBook?.bookId ?? ''}
-                  onChange={(e) => setArchiveBookId(e.target.value)}
-                >
-                  {archive.map((b) => (
-                    <option key={b.bookId} value={b.bookId}>
-                      {b.title} ({b.entries.length})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {archiveBook && onRemoveArchiveBook && (
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => onRemoveArchiveBook(archiveBook.bookId)}
-                >
-                  Quitar del archivo
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {items.length === 0 ? (
-        <div className="glossary empty">
-          <p>
-            {scope === 'chapter'
-              ? 'Sin entradas en este capítulo. El glosario se llena cuando hay vocabulario difícil.'
-              : 'Sin entradas todavía en este alcance.'}
+      {scope === 'book' ? (
+        <>
+          <p className="hint glossary-hint">
+            {bookTitle
+              ? `Palabras difíciles de «${bookTitle}» (se acumulan al leer).`
+              : 'Abrí un libro para ver su glosario acumulado.'}
+            {' '}
+            Podés abrir una ventana aparte sin cortar el audio.
           </p>
-        </div>
+          <GlossaryList
+            items={bookItems}
+            empty="Todavía no hay entradas en este libro. Aparecen al leer capítulos con vocabulario difícil."
+          />
+        </>
       ) : (
-        <ul className="glossary-list">
-          {items.map((item) => (
-            <li key={item.id} className={`glossary-item kind-${item.kind}`}>
-              <header>
-                <strong className="lemma">{item.word}</strong>
-                <span className={`pill kind-${item.kind}`}>
-                  {item.kind === 'substituted' ? 'Sustituida' : 'Conservada'}
-                </span>
-                <span className="pill level">N{item.level}</span>
-              </header>
-              <p className="def">{item.definition}</p>
-              {item.audioExpression && (
-                <p className="meta">
-                  <span className="label">En el audio / texto</span>
-                  {item.audioExpression}
-                </p>
-              )}
-              <p className="meta quote">
-                <span className="label">Frase original · cap. {item.chapter}</span>
-                «{item.originalSentence}»
-              </p>
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="hint glossary-hint">
+            Glosario general: todo lo archivado, separado por libro. Incluye
+            libros que ya no estén en los slots.
+          </p>
+          {archive.length === 0 ? (
+            <div className="glossary empty">
+              <p>Todavía no hay libros en el archivo de glosario.</p>
+            </div>
+          ) : (
+            <div className="glossary-general">
+              {archive.map((book) => (
+                <section key={book.bookId} className="glossary-book-block">
+                  <div className="glossary-book-head">
+                    <h3>
+                      {book.title}{' '}
+                      <span className="glossary-book-count">
+                        ({book.entries.length})
+                      </span>
+                    </h3>
+                    {onRemoveArchiveBook && (
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() => onRemoveArchiveBook(book.bookId)}
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <p className="hint glossary-book-meta">
+                    {book.sourceName} · {book.format}
+                  </p>
+                  <GlossaryList
+                    items={book.entries}
+                    empty="Sin entradas en este libro."
+                  />
+                </section>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
+  )
+}
+
+function GlossaryList({
+  items,
+  empty,
+}: {
+  items: GlossaryItem[]
+  empty: string
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="glossary empty">
+        <p>{empty}</p>
+      </div>
+    )
+  }
+
+  return (
+    <ul className="glossary-list">
+      {items.map((item) => (
+        <li key={item.id} className={`glossary-item kind-${item.kind}`}>
+          <header>
+            <strong className="lemma">{item.word}</strong>
+            <span className={`pill kind-${item.kind}`}>
+              {item.kind === 'substituted' ? 'Sustituida' : 'Conservada'}
+            </span>
+            <span className="pill level">N{item.level}</span>
+          </header>
+          <p className="def">{item.definition}</p>
+          {item.audioExpression && (
+            <p className="meta">
+              <span className="label">En el audio / texto</span>
+              {item.audioExpression}
+            </p>
+          )}
+          <p className="meta quote">
+            <span className="label">Frase original · cap. {item.chapter}</span>
+            «{item.originalSentence}»
+          </p>
+        </li>
+      ))}
+    </ul>
   )
 }

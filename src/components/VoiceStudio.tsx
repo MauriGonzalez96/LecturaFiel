@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSpeech } from '../hooks/useSpeech'
 import { useVoiceSettings } from '../hooks/useVoiceSettings'
 import { downloadPiperVoice, previewVoice } from '../voices/api'
+import {
+  clampSpeechRate,
+  DEFAULT_SPEECH_RATE,
+} from '../voices/rate'
 import type { VoiceSource } from '../voices/types'
+import { SpeechRateControl } from './SpeechRateControl'
 
 interface Props {
   onClose?: () => void
@@ -22,6 +27,7 @@ export function VoiceStudio({ onClose }: Props) {
     setSampleText,
     error,
     save,
+    setRate,
     reload,
   } = useVoiceSettings()
 
@@ -35,6 +41,9 @@ export function VoiceStudio({ onClose }: Props) {
 
   const [tab, setTab] = useState<VoiceSource>(prefs.source ?? 'piper')
   const [selectedId, setSelectedId] = useState<string | null>(prefs.voiceId)
+  const [rate, setRateLocal] = useState(() =>
+    clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE),
+  )
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -42,7 +51,8 @@ export function VoiceStudio({ onClose }: Props) {
   useEffect(() => {
     if (prefs.source) setTab(prefs.source)
     if (prefs.voiceId) setSelectedId(prefs.voiceId)
-  }, [prefs.source, prefs.voiceId])
+    setRateLocal(clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE))
+  }, [prefs.source, prefs.voiceId, prefs.rate])
 
   const windowsList = useMemo(
     () =>
@@ -94,7 +104,7 @@ export function VoiceStudio({ onClose }: Props) {
           await reload()
         }
         setMsg('Sintetizando con Piper…')
-        const url = await previewVoice('piper', selectedId, sampleText)
+        const url = await previewVoice('piper', selectedId, sampleText, rate)
         const audio = new Audio(url)
         audioRef.current = audio
         audio.onended = () => setMsg('Muestra terminada.')
@@ -103,7 +113,7 @@ export function VoiceStudio({ onClose }: Props) {
         return
       }
       setMsg('Generando muestra neural (internet)…')
-      const url = await previewVoice('neural', selectedId, sampleText)
+      const url = await previewVoice('neural', selectedId, sampleText, rate)
       const audio = new Audio(url)
       audioRef.current = audio
       audio.onended = () => setMsg('Muestra terminada.')
@@ -132,9 +142,9 @@ export function VoiceStudio({ onClose }: Props) {
           await reload()
         }
       }
-      await save(tab, selectedId)
+      await save(tab, selectedId, rate)
       if (tab === 'windows') setVoiceURI(selectedId)
-      setMsg('Voz guardada. El lector la usará a partir de ahora.')
+      setMsg('Voz y velocidad guardadas. El lector las usará a partir de ahora.')
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
@@ -257,6 +267,15 @@ export function VoiceStudio({ onClose }: Props) {
         />
       </label>
 
+      <SpeechRateControl
+        rate={rate}
+        onChange={(next) => {
+          setRateLocal(next)
+          void setRate(next)
+        }}
+        disabled={busy}
+      />
+
       <div className="voice-list" role="listbox" aria-label="Lista de voces">
         {list.length === 0 ? (
           <p className="hint">No hay voces en esta categoría.</p>
@@ -315,7 +334,8 @@ export function VoiceStudio({ onClose }: Props) {
 
       {prefs.source && prefs.voiceId && (
         <p className="hint">
-          Voz activa: <strong>{prefs.source}</strong> · {prefs.voiceId}
+          Voz activa: <strong>{prefs.source}</strong> · {prefs.voiceId} ·{' '}
+          {clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE).toFixed(2)}×
         </p>
       )}
     </div>

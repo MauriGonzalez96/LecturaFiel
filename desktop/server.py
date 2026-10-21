@@ -139,13 +139,17 @@ class FrontHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/voices/prefs":
             body = self._read_json()
-            prefs = save_prefs(
-                {
-                    "source": body.get("source"),
-                    "voiceId": body.get("voiceId"),
-                    "firstRunDone": True,
-                }
-            )
+            patch: dict = {"firstRunDone": True}
+            if body.get("source") is not None:
+                patch["source"] = body.get("source")
+            if "voiceId" in body:
+                patch["voiceId"] = body.get("voiceId")
+            if body.get("rate") is not None:
+                try:
+                    patch["rate"] = float(body.get("rate"))
+                except (TypeError, ValueError):
+                    pass
+            prefs = save_prefs(patch)
             self._json({"ok": True, "prefs": prefs})
             return
 
@@ -168,14 +172,15 @@ class FrontHandler(SimpleHTTPRequestHandler):
             voice = body.get("voiceId") or ""
             source = body.get("source") or "neural"
             text = body.get("text") or SAMPLE_TEXT
+            rate = body.get("rate")
             if not voice:
                 self._json({"error": "Falta voiceId"}, 400)
                 return
             try:
                 if source == "piper":
-                    dest = synthesize_piper_wav(voice, text)
+                    dest = synthesize_piper_wav(voice, text, rate=rate)
                 else:
-                    dest = synthesize_preview(voice, text)
+                    dest = synthesize_preview(voice, text, rate=rate)
                 cleanup_old_audio()
                 self._json({"ok": True, "url": f"/api/audio/{dest.name}"})
             except Exception as e:
@@ -188,14 +193,15 @@ class FrontHandler(SimpleHTTPRequestHandler):
             voice = body.get("voiceId") or ""
             source = body.get("source") or "neural"
             text = body.get("text") or ""
+            rate = body.get("rate")
             if not voice or not text.strip():
                 self._json({"error": "Faltan voiceId o text"}, 400)
                 return
             try:
                 if source == "piper":
-                    dest = synthesize_piper_wav(voice, text)
+                    dest = synthesize_piper_wav(voice, text, rate=rate)
                 else:
-                    dest = synthesize_to_file(voice, text)
+                    dest = synthesize_to_file(voice, text, rate=rate)
                 cleanup_old_audio(keep=4)
                 self._json({"ok": True, "url": f"/api/audio/{dest.name}"})
             except Exception as e:

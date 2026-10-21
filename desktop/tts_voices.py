@@ -45,12 +45,21 @@ def load_prefs() -> dict[str, Any]:
         return {
             "source": None,
             "voiceId": None,
+            "rate": 0.92,
             "firstRunDone": False,
         }
     try:
-        return json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+        data = json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+        if "rate" not in data:
+            data["rate"] = 0.92
+        return data
     except Exception:
-        return {"source": None, "voiceId": None, "firstRunDone": False}
+        return {
+            "source": None,
+            "voiceId": None,
+            "rate": 0.92,
+            "firstRunDone": False,
+        }
 
 
 def save_prefs(prefs: dict[str, Any]) -> dict[str, Any]:
@@ -151,7 +160,22 @@ def list_neural_voices() -> list[dict[str, str]]:
         ]
 
 
-async def _synthesize(voice: str, text: str, dest: Path) -> None:
+def _clamp_rate(rate: float | None) -> float:
+    try:
+        r = float(rate) if rate is not None else 0.92
+    except (TypeError, ValueError):
+        r = 0.92
+    return max(0.7, min(1.35, r))
+
+
+def _edge_rate_arg(rate: float | None) -> str:
+    pct = int(round((_clamp_rate(rate) - 1.0) * 100))
+    return f"{pct:+d}%"
+
+
+async def _synthesize(
+    voice: str, text: str, dest: Path, rate: float | None = None
+) -> None:
     import edge_tts
 
     clean = re.sub(r"\s+", " ", text).strip()
@@ -159,21 +183,25 @@ async def _synthesize(voice: str, text: str, dest: Path) -> None:
         raise ValueError("Texto vacío")
     if len(clean) > 2800:
         clean = clean[:2800]
-    communicate = edge_tts.Communicate(clean, voice)
+    communicate = edge_tts.Communicate(clean, voice, rate=_edge_rate_arg(rate))
     await communicate.save(str(dest))
 
 
-def synthesize_to_file(voice: str, text: str) -> Path:
+def synthesize_to_file(
+    voice: str, text: str, rate: float | None = None
+) -> Path:
     from async_loop import run_coro
 
     _ensure_dirs()
     dest = AUDIO_DIR / f"{uuid.uuid4().hex}.mp3"
-    run_coro(_synthesize(voice, text, dest), timeout=180)
+    run_coro(_synthesize(voice, text, dest, rate=rate), timeout=180)
     return dest
 
 
-def synthesize_preview(voice: str, text: str | None = None) -> Path:
-    return synthesize_to_file(voice, text or SAMPLE_TEXT)
+def synthesize_preview(
+    voice: str, text: str | None = None, rate: float | None = None
+) -> Path:
+    return synthesize_to_file(voice, text or SAMPLE_TEXT, rate=rate)
 
 
 def cleanup_old_audio(keep: int = 8) -> None:

@@ -74,14 +74,15 @@ export async function fetchVoicePrefs(): Promise<{
   }
 }
 
-export async function saveVoicePrefs(
-  source: VoiceSource,
-  voiceId: string,
-): Promise<VoicePrefs> {
+export async function saveVoicePrefs(partial: {
+  source?: VoiceSource
+  voiceId?: string | null
+  rate?: number
+}): Promise<VoicePrefs> {
   const r = await fetch('/api/voices/prefs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source, voiceId }),
+    body: JSON.stringify(partial),
   })
   if (!r.ok) throw new Error('No se pudo guardar la voz')
   const data = (await r.json()) as { prefs: VoicePrefs }
@@ -92,11 +93,12 @@ export async function previewVoice(
   source: 'neural' | 'piper',
   voiceId: string,
   text: string,
+  rate?: number,
 ): Promise<string> {
   const r = await fetch('/api/voices/preview', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source, voiceId, text }),
+    body: JSON.stringify({ source, voiceId, text, rate }),
   })
   const data = (await r.json()) as { url?: string; error?: string }
   if (!r.ok || !data.url) throw new Error(data.error || 'Error al generar audio')
@@ -107,11 +109,12 @@ export async function speakRemote(
   source: 'neural' | 'piper',
   voiceId: string,
   text: string,
+  rate?: number,
 ): Promise<string> {
   const r = await fetch('/api/voices/speak', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source, voiceId, text }),
+    body: JSON.stringify({ source, voiceId, text, rate }),
   })
   const data = (await r.json()) as { url?: string; error?: string }
   if (!r.ok || !data.url) throw new Error(data.error || 'Error al generar audio')

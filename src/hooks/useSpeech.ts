@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { speakRemote, ttsApiAvailable } from '../voices/api'
+import { clampSpeechRate, DEFAULT_SPEECH_RATE } from '../voices/rate'
 import type { VoicePrefs } from '../voices/types'
 import { splitSpeechChunks } from './speechChunks'
 
@@ -44,11 +45,17 @@ function pickBestVoice(
 function readPrefs(): VoicePrefs {
   try {
     const raw = localStorage.getItem(LOCAL_PREFS_KEY)
-    if (raw) return JSON.parse(raw) as VoicePrefs
+    if (raw) {
+      const parsed = JSON.parse(raw) as VoicePrefs
+      return {
+        ...parsed,
+        rate: clampSpeechRate(parsed.rate ?? DEFAULT_SPEECH_RATE),
+      }
+    }
   } catch {
     /* ignore */
   }
-  return { source: 'windows', voiceId: null }
+  return { source: 'windows', voiceId: null, rate: DEFAULT_SPEECH_RATE }
 }
 
 /**
@@ -160,7 +167,12 @@ export function useSpeech() {
   }, [])
 
   const speakWindowsChunk = useCallback(
-    (chunk: string, preferredURI: string | null, session: number) =>
+    (
+      chunk: string,
+      preferredURI: string | null,
+      session: number,
+      rate: number,
+    ) =>
       new Promise<void>((resolve, reject) => {
         if (!('speechSynthesis' in window)) {
           reject(new Error('unsupported'))
@@ -179,7 +191,7 @@ export function useSpeech() {
         } else {
           u.lang = 'es-ES'
         }
-        u.rate = 0.92
+        u.rate = clampSpeechRate(rate)
         u.onstart = () => {
           if (session === sessionRef.current) setStatus('speaking')
         }
@@ -197,9 +209,10 @@ export function useSpeech() {
       source: 'neural' | 'piper',
       voiceId: string,
       session: number,
+      rate: number,
     ) => {
       setStatus('loading')
-      const url = await speakRemote(source, voiceId, chunk)
+      const url = await speakRemote(source, voiceId, chunk, rate)
       if (session !== sessionRef.current || stopRequestedRef.current) return
       await new Promise<void>((resolve, reject) => {
         const audio = new Audio(url)
@@ -236,6 +249,7 @@ export function useSpeech() {
 
       const chunks = splitSpeechChunks(clean)
       const prefs = readPrefs()
+      const rate = clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE)
       const apiOk = await ttsApiAvailable()
       const useRemote =
         (prefs.source === 'neural' || prefs.source === 'piper') &&
@@ -260,13 +274,14 @@ export function useSpeech() {
                 prefs.source as 'neural' | 'piper',
                 prefs.voiceId,
                 session,
+                rate,
               )
             } catch (err) {
               console.error(err)
-              await speakWindowsChunk(chunk, uri, session)
+              await speakWindowsChunk(chunk, uri, session, rate)
             }
           } else {
-            await speakWindowsChunk(chunk, uri, session)
+            await speakWindowsChunk(chunk, uri, session, rate)
           }
         }
 

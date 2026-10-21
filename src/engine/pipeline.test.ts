@@ -44,6 +44,18 @@ describe('detectCandidates', () => {
       candidates.some((c) => c.token.normalized === 'camino'),
     ).toBe(false)
   })
+
+  it('modo mínimo solo admite N3 y sin rareza', () => {
+    const { candidates, rarityCount } = detectCandidates(
+      'Empero el sofisma y un hipogrifo.',
+      undefined,
+      { minLevel: 3, includeRarity: false },
+    )
+    const lemmas = candidates.map((c) => c.entry.lemma)
+    expect(lemmas).toContain('empero')
+    expect(lemmas).not.toContain('sofisma')
+    expect(rarityCount).toBe(0)
+  })
 })
 
 describe('runPipeline', () => {

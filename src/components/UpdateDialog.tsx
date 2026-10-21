@@ -1,67 +1,43 @@
 import { useId } from 'react'
+import type { useAppUpdate, UpdateUiStatus } from '../hooks/useAppUpdate'
 import { RELEASES_PAGE } from '../updates/config'
-import { useAppUpdate, type UpdateUiStatus } from '../hooks/useAppUpdate'
 import { APP_VERSION_LABEL } from '../version'
 
-/** Botón «Buscar actualizaciones» + popup al detectar versión nueva. */
-export function UpdateChecker() {
-  const {
-    status,
-    release,
-    error,
-    popupOpen,
-    localVersion,
-    checkNow,
-    dismiss,
-    acceptUpdate,
-    closePopup,
-  } = useAppUpdate()
-  const titleId = useId()
+type UpdateApi = ReturnType<typeof useAppUpdate>
 
-  const checking = status === 'checking'
+/** Popup de actualizaciones (sin botón propio). */
+export function UpdateDialog({ update }: { update: UpdateApi }) {
+  const titleId = useId()
+  if (!update.popupOpen) return null
 
   return (
-    <>
-      <button
-        type="button"
-        className="btn ghost update-check-btn"
-        onClick={checkNow}
-        disabled={checking}
-        title="Consultar GitHub Releases"
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onClick={() => {
+        if (update.status === 'available') update.dismiss()
+        else update.closePopup()
+      }}
+    >
+      <div
+        className="modal update-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
       >
-        {checking ? 'Buscando…' : 'Buscar actualizaciones'}
-      </button>
-
-      {popupOpen && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={() => {
-            if (status === 'available') dismiss()
-            else closePopup()
-          }}
-        >
-          <div
-            className="modal update-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <UpdateModalBody
-              titleId={titleId}
-              status={status}
-              release={release}
-              error={error}
-              localVersion={localVersion}
-              onDismiss={dismiss}
-              onAccept={acceptUpdate}
-              onClose={closePopup}
-            />
-          </div>
-        </div>
-      )}
-    </>
+        <UpdateModalBody
+          titleId={titleId}
+          status={update.status}
+          release={update.release}
+          error={update.error}
+          localVersion={update.localVersion}
+          onDismiss={update.dismiss}
+          onAccept={update.acceptUpdate}
+          onClose={update.closePopup}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -77,7 +53,7 @@ function UpdateModalBody({
 }: {
   titleId: string
   status: UpdateUiStatus
-  release: ReturnType<typeof useAppUpdate>['release']
+  release: UpdateApi['release']
   error: string | null
   localVersion: string
   onDismiss: () => void
@@ -170,7 +146,7 @@ function UpdateModalBody({
           <code>.exe</code> (no se puede reemplazar el que está en uso).
         </p>
         <p className="update-meta">
-          Si el navegador/bloqueó la descarga, usá{' '}
+          Si el navegador bloqueó la descarga, usá{' '}
           <a href={release.htmlUrl} target="_blank" rel="noreferrer">
             la página del release
           </a>

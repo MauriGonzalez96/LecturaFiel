@@ -7,6 +7,7 @@ import {
   saveVoicePrefs,
   ttsApiAvailable,
 } from '../voices/api'
+import { clampSpeechRate, DEFAULT_SPEECH_RATE } from '../voices/rate'
 import type {
   NeuralVoice,
   PiperVoiceInfo,
@@ -16,19 +17,41 @@ import type {
 
 const LOCAL_PREFS_KEY = 'lectura-fiel:voice-prefs'
 
+function normalizePrefs(prefs: VoicePrefs): VoicePrefs {
+  return {
+    ...prefs,
+    rate: clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE),
+  }
+}
+
 function readLocalPrefs(): VoicePrefs {
   try {
     const raw = localStorage.getItem(LOCAL_PREFS_KEY)
-    if (!raw) return { source: 'windows', voiceId: null, firstRunDone: false }
-    return JSON.parse(raw) as VoicePrefs
+    if (!raw) {
+      return {
+        source: 'windows',
+        voiceId: null,
+        rate: DEFAULT_SPEECH_RATE,
+        firstRunDone: false,
+      }
+    }
+    return normalizePrefs(JSON.parse(raw) as VoicePrefs)
   } catch {
-    return { source: 'windows', voiceId: null, firstRunDone: false }
+    return {
+      source: 'windows',
+      voiceId: null,
+      rate: DEFAULT_SPEECH_RATE,
+      firstRunDone: false,
+    }
   }
 }
 
 function writeLocalPrefs(prefs: VoicePrefs) {
   try {
-    localStorage.setItem(LOCAL_PREFS_KEY, JSON.stringify(prefs))
+    localStorage.setItem(
+      LOCAL_PREFS_KEY,
+      JSON.stringify(normalizePrefs(prefs)),
+    )
   } catch {
     /* ignore */
   }
@@ -55,8 +78,12 @@ export function useVoiceSettings() {
           fetchNeuralVoices(),
           fetchPiperVoices(),
         ])
-        setPrefs(prefsRes.prefs)
-        writeLocalPrefs(prefsRes.prefs)
+        const merged = normalizePrefs({
+          ...prefsRes.prefs,
+          rate: prefsRes.prefs.rate ?? readLocalPrefs().rate,
+        })
+        setPrefs(merged)
+        writeLocalPrefs(merged)
         setSampleText(
           prefsRes.sampleText || neural.sampleText || DEFAULT_SAMPLE,
         )
@@ -79,14 +106,18 @@ export function useVoiceSettings() {
   }, [reload])
 
   const save = useCallback(
-    async (source: VoiceSource, voiceId: string) => {
+    async (source: VoiceSource, voiceId: string, rate?: number) => {
+      const nextRate = clampSpeechRate(rate ?? prefs.rate ?? DEFAULT_SPEECH_RATE)
       const next: VoicePrefs = {
         source,
         voiceId,
+        rate: nextRate,
         firstRunDone: true,
       }
       if (apiOk) {
-        const saved = await saveVoicePrefs(source, voiceId)
+        const saved = normalizePrefs(
+          await saveVoicePrefs({ source, voiceId, rate: nextRate }),
+        )
         setPrefs(saved)
         writeLocalPrefs(saved)
         return saved
@@ -95,7 +126,32 @@ export function useVoiceSettings() {
       setPrefs(next)
       return next
     },
-    [apiOk],
+    [apiOk, prefs.rate],
+  )
+
+  const setRate = useCallback(
+    async (rate: number) => {
+      const nextRate = clampSpeechRate(rate)
+      const next: VoicePrefs = normalizePrefs({ ...prefs, rate: nextRate })
+      setPrefs(next)
+      writeLocalPrefs(next)
+      if (apiOk) {
+        try {
+          const saved = normalizePrefs(
+            await saveVoicePrefs({
+              source: prefs.source ?? undefined,
+              voiceId: prefs.voiceId,
+              rate: nextRate,
+            }),
+          )
+          setPrefs(saved)
+          writeLocalPrefs(saved)
+        } catch {
+          /* local already saved */
+        }
+      }
+    },
+    [apiOk, prefs],
   )
 
   return {
@@ -108,6 +164,7 @@ export function useVoiceSettings() {
     setSampleText,
     error,
     save,
+    setRate,
     reload,
   }
 }

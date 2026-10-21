@@ -10,12 +10,12 @@ import { AudioPlayer } from './components/AudioPlayer'
 import { ChangeLog } from './components/ChangeLog'
 import { FileUpload } from './components/FileUpload'
 import { BookNav } from './components/BookNav'
-import { CloseAppButton } from './components/CloseAppButton'
 import { LibraryShelf } from './components/LibraryShelf'
-import { UpdateChecker } from './components/UpdateChecker'
+import { SettingsMenu } from './components/SettingsMenu'
 import { VoiceStudio } from './components/VoiceStudio'
 import { useLibrary } from './library/useLibrary'
 import { useGlossaryVault } from './glossary/useGlossaryVault'
+import { useInterventionMode } from './hooks/useInterventionMode'
 import { useVoiceSettings } from './hooks/useVoiceSettings'
 import { MAX_LIBRARY_SLOTS } from './library/types'
 import { DEMO_ENABLED } from './env'
@@ -27,6 +27,7 @@ type Tab = 'adapted' | 'original' | 'glossary' | 'review' | 'voices'
 export default function App() {
   const library = useLibrary()
   const glossaryVault = useGlossaryVault()
+  const intervention = useInterventionMode()
   useVoiceSettings()
   const [demoMode, setDemoMode] = useState(DEMO_ENABLED)
   const [demoText, setDemoText] = useState(SAMPLE_CHAPTER.text)
@@ -60,10 +61,16 @@ export default function App() {
   const result = useMemo(() => {
     void cacheTick
     if (!text.trim() && !showDemo) {
-      return runPipeline('', 1)
+      return runPipeline('', {
+        chapter: 1,
+        intervention: intervention.options,
+      })
     }
-    return runPipeline(text, chapter)
-  }, [text, chapter, cacheTick, showDemo])
+    return runPipeline(text, {
+      chapter,
+      intervention: intervention.options,
+    })
+  }, [text, chapter, cacheTick, showDemo, intervention.options])
 
   // Persistir glosario del capítulo en el archivo por libro
   useEffect(() => {
@@ -193,8 +200,14 @@ export default function App() {
             </p>
           </div>
           <div className="top-actions">
-            <UpdateChecker />
-            <CloseAppButton />
+            <SettingsMenu
+              onOpenVoices={() => setTab('voices')}
+              onClearCache={clearCache}
+              onDemo={DEMO_ENABLED ? goDemo : undefined}
+              demoEnabled={DEMO_ENABLED}
+              interventionMode={intervention.mode}
+              onInterventionMode={intervention.setMode}
+            />
           </div>
         </div>
       </header>
@@ -203,30 +216,6 @@ export default function App() {
         <section className="panel input-panel">
           <div className="panel-head">
             <h2>Fuente</h2>
-            <div className="actions">
-              {DEMO_ENABLED && (
-                <button type="button" className="btn ghost" onClick={goDemo}>
-                  Demo
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setTab('voices')}
-              >
-                Voces
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setTab('glossary')}
-              >
-                Glosario
-              </button>
-              <button type="button" className="btn ghost" onClick={clearCache}>
-                Limpiar caché léxica
-              </button>
-            </div>
           </div>
 
           {!library.ready ? (
@@ -324,7 +313,6 @@ export default function App() {
                   ['original', 'Original'],
                   ['glossary', `Glosario (${glossaryTabCount})`],
                   ['review', 'Repaso'],
-                  ['voices', 'Voces'],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -342,18 +330,8 @@ export default function App() {
           </div>
 
           {tab === 'voices' ? (
-            <VoiceStudio />
-          ) : tab === 'glossary' ? (
-            <GlossaryPanel
-              chapterItems={result.glossary}
-              bookItems={bookGlossary}
-              bookTitle={book?.title}
-              archive={glossaryVault.vault.books}
-              onDownload={glossaryVault.downloadJson}
-              onImportFile={glossaryVault.importJson}
-              onRemoveArchiveBook={(id) => void glossaryVault.removeBook(id)}
-            />
-          ) : emptyProduction ? (
+            <VoiceStudio onClose={() => setTab('adapted')} />
+          ) : emptyProduction && tab !== 'glossary' ? (
             <p className="empty-panel">
               Cuando cargues un libro vas a ver el texto adaptado, el glosario y
               los controles de audio acá. Podés ver el archivo de glosario en la
@@ -369,27 +347,40 @@ export default function App() {
             </p>
           ) : (
             <>
-              <StatsBar result={result} />
-
-              {tab !== 'review' && (
-                <ChangeLog substitutions={result.substitutions} />
-              )}
-
-              {tab !== 'review' && (
-                <AudioPlayer
-                  adaptedText={result.adaptedText}
-                  originalText={result.originalText}
-                  chapterKey={`${book?.id ?? 'demo'}:${chapterIndex}`}
-                  currentLabel={currentChapterLabel}
-                  hasNextChapter={hasNextChapter}
-                  nextChapterLabel={nextChapterLabel}
-                  onAdvanceChapter={advanceChapter}
-                  onOpenVoices={() => setTab('voices')}
-                />
+              {/* Audio queda montado también en Glosario para no cortar la lectura */}
+              {tab !== 'review' && !emptyProduction && (
+                <>
+                  {tab !== 'glossary' && <StatsBar result={result} />}
+                  {tab !== 'glossary' && (
+                    <ChangeLog substitutions={result.substitutions} />
+                  )}
+                  <AudioPlayer
+                    adaptedText={result.adaptedText}
+                    originalText={result.originalText}
+                    chapterKey={`${book?.id ?? 'demo'}:${chapterIndex}`}
+                    currentLabel={currentChapterLabel}
+                    hasNextChapter={hasNextChapter}
+                    nextChapterLabel={nextChapterLabel}
+                    onAdvanceChapter={advanceChapter}
+                    onOpenVoices={() => setTab('voices')}
+                  />
+                </>
               )}
 
               <div className="result-body">
-                {tab === 'review' ? (
+                {tab === 'glossary' ? (
+                  <GlossaryPanel
+                    bookItems={bookGlossary}
+                    bookTitle={book?.title}
+                    archive={glossaryVault.vault.books}
+                    initialScope={book ? 'book' : 'general'}
+                    onDownload={glossaryVault.downloadJson}
+                    onImportFile={glossaryVault.importJson}
+                    onRemoveArchiveBook={(id) =>
+                      void glossaryVault.removeBook(id)
+                    }
+                  />
+                ) : tab === 'review' ? (
                   <GlossaryQuiz items={reviewItems} />
                 ) : (
                   <HighlightedText

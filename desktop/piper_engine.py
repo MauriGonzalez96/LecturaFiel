@@ -115,7 +115,20 @@ def _worker_command(job_path: Path) -> list[str]:
     return [sys.executable, str(main_py), "--piper-worker", str(job_path)]
 
 
-def synthesize_piper_wav(voice_id: str, text: str) -> Path:
+def _length_scale_from_rate(rate: float | None) -> float:
+    try:
+        r = float(rate) if rate is not None else 0.92
+    except (TypeError, ValueError):
+        r = 0.92
+    r = max(0.7, min(1.35, r))
+    if r <= 0:
+        return 1.0
+    return round(1.0 / r, 3)
+
+
+def synthesize_piper_wav(
+    voice_id: str, text: str, rate: float | None = None
+) -> Path:
     """Síntesis en subprocess: si ONNX crashea, la ventana principal sobrevive."""
     _ensure_dirs()
     clean = re.sub(r"\s+", " ", text).strip()
@@ -157,6 +170,7 @@ def synthesize_piper_wav(voice_id: str, text: str) -> Path:
         "out": str(dest),
         "models": str(PIPER_DIR),
         "espeakDataDir": espeak_hint,
+        "lengthScale": _length_scale_from_rate(rate),
     }
     job_path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
 

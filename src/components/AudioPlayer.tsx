@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useSpeech, type SpeechStatus } from '../hooks/useSpeech'
+import { useSpeechRate } from '../hooks/useSpeechRate'
+import { SpeechRateControl } from './SpeechRateControl'
 
 interface Props {
   adaptedText: string
@@ -43,6 +45,7 @@ export function AudioPlayer({
   onOpenVoices,
 }: Props) {
   const { status, speak, stop, pause, resume } = useSpeech()
+  const { rate, setRate } = useSpeechRate()
   const [askContinue, setAskContinue] = useState(readAskContinue)
   const [source, setSource] = useState<Source>('adapted')
   const [prompt, setPrompt] = useState<PromptKind>(null)
@@ -227,6 +230,13 @@ export function AudioPlayer({
             Avisar al terminar
           </label>
         </div>
+
+        <SpeechRateControl
+          rate={rate}
+          onChange={setRate}
+          compact
+          disabled={status === 'loading'}
+        />
 
         <StatusDot status={status} />
       </div>
