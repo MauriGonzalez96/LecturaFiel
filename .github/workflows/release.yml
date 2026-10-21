@@ -1,0 +1,145 @@
+# Publica LecturaFiel.exe en GitHub Releases al pushear un tag v*
+# Uso:
+#   1. Subí la versión en package.json (ej. 0.3.1)
+#   2. Commit + push a main
+#   3. git tag v0.3.1 && git push origin v0.3.1
+# La Action buildea en Windows y adjunta el .exe al Release.
+# La app detecta ese Release con «Buscar actualizaciones».
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag a publicar (ej. v0.3.1). Debe existir o se crea desde package.json.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: desktop/requirements.txt
+
+      - name: Resolver versión
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+            VER="${TAG#v}"
+          elif [[ -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
+            [[ "${TAG}" == v* ]] || TAG="v${TAG}"
+            VER="${TAG#v}"
+          else
+            VER="$(node -p "require('./package.json').version")"
+            TAG="v${VER}"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Versión de release: ${TAG}"
+
+      - name: Sincronizar package.json y desktop/VERSION
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const ver = process.env.VER;
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.version = ver;
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          fs.writeFileSync('desktop/VERSION', ver + '\n');
+          console.log('version ->', ver);
+          NODE
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Preparar static_front
+        shell: pwsh
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          if (Test-Path desktop/static_front) { Remove-Item -Recurse -Force desktop/static_front }
+          New-Item -ItemType Directory -Path desktop/static_front | Out-Null
+          Copy-Item -Recurse -Force dist/* desktop/static_front/
+          Set-Content -Path desktop/VERSION -Value $env:VER -NoNewline
+          Set-Content -Path desktop/static_front/version.json -Value "{`"version`":`"$env:VER`"}" -NoNewline
+
+      - name: Instalar deps Python
+        run: python -m pip install --upgrade pip && python -m pip install -r desktop/requirements.txt
+
+      - name: PyInstaller
+        working-directory: desktop
+        env:
+          CI: 'true'
+          LECTURA_FIEL_UPX: '0'
+        run: python -m PyInstaller --noconfirm ../build_specs/lectura-fiel.spec
+
+      - name: Empaquetar carpeta release
+        shell: pwsh
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          $exeName = "LecturaFiel-v$env:VER.exe"
+          $built = "desktop/dist/$exeName"
+          if (-not (Test-Path $built)) {
+            Write-Error "No se encontró $built"
+            Get-ChildItem desktop/dist -ErrorAction SilentlyContinue
+            exit 1
+          }
+          $out = "release/v$env:VER"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item $built "$out/LecturaFiel.exe"
+          Copy-Item $built "$out/$exeName"
+          Set-Content -Path "$out/VERSION.txt" -Value $env:VER
+          Get-ChildItem $out | Format-Table Name, Length
+
+      - name: Crear / actualizar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Lectura Fiel ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release/v${{ steps.ver.outputs.version }}/LecturaFiel.exe
+            release/v${{ steps.ver.outputs.version }}/LecturaFiel-v${{ steps.ver.outputs.version }}.exe
+            release/v${{ steps.ver.outputs.version }}/VERSION.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

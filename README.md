@@ -39,11 +39,25 @@ Requisitos: Python 3, WebView2 Runtime (Windows 10/11 lo trae), `pip install -r 
 
 La versión vive en `package.json` (hoy `0.3.0`). Al subir features, aumentala antes de `build.bat`. El resultado queda en `release\v0.3.0\`.
 
-Para que la app avise actualizaciones:
+### Publicar una versión (automático)
 
-1. Creá un **GitHub Release** en [MauriGonzalez96/LecturaFiel](https://github.com/MauriGonzalez96/LecturaFiel/releases) con tag `v0.3.0` (o la versión que sea).
-2. Adjuntá el asset `LecturaFiel-v0.3.0.exe` (o `LecturaFiel.exe`).
-3. En la app: botón **Buscar actualizaciones** (arriba a la derecha). También chequea sola unos segundos después de abrir; si hay versión nueva, muestra un popup (Actualizar / Ahora no).
+1. Subí la versión en `package.json` (ej. `0.3.1`).
+2. Commit y push a `main`.
+3. Creá y pusheá el tag:
+
+```bash
+git tag v0.3.1
+git push origin v0.3.1
+```
+
+4. GitHub Actions (workflow **Release**) buildea el `.exe` en Windows y lo publica en [Releases](https://github.com/MauriGonzalez96/LecturaFiel/releases).
+
+### En la app
+
+- Botón **Buscar actualizaciones** (arriba a la derecha).
+- También chequea sola al abrir; si hay versión nueva → popup (Actualizar / Ahora no).
+
+**Primera vez:** alguien tiene que instalar/abrir un `.exe` (el del Release). Después, cada tag nuevo actualiza solo vía ese aviso.
 
 ## Qué incluye este MVP
 

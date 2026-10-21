@@ -2,9 +2,13 @@
 # Ejecutar desde desktop/: pyinstaller --noconfirm ..\build_specs\lectura-fiel.spec
 
 import json
+import os
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
+
+# UPX a veces falta o falla en CI; desactivar con CI=1 o LECTURA_FIEL_UPX=0
+_USE_UPX = os.environ.get("LECTURA_FIEL_UPX", "0" if os.environ.get("CI") else "1") == "1"
 
 ROOT = Path(SPECPATH).resolve().parent
 DESKTOP_ROOT = ROOT / "desktop"
@@ -74,7 +78,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=_USE_UPX,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
