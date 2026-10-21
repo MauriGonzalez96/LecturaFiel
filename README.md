@@ -37,7 +37,7 @@ Requisitos: Python 3, WebView2 Runtime (Windows 10/11 lo trae), `pip install -r 
 
 ## Versión y actualizaciones
 
-La versión vive en `package.json` (hoy `0.3.0`). Al subir features, aumentala antes de `build.bat`. El resultado queda en `release\v0.3.0\`.
+La versión vive en `package.json` (hoy `0.3.1`). Al subir features, aumentala antes de `build.bat` / del tag. El resultado local queda en `release\v0.3.1\`.
 
 ### Publicar una versión (automático)
 
