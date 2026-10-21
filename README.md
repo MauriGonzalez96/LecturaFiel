@@ -59,6 +59,16 @@ git push origin v0.3.1
 
 **Primera vez:** alguien tiene que instalar/abrir un `.exe` (el del Release). Después, cada tag nuevo actualiza solo vía ese aviso.
 
+### Si Windows bloquea el .exe (“permisos” / SmartScreen)
+
+El instalable **no está firmado** con certificado de Microsoft, así que Windows suele avisar:
+
+1. Clic derecho en `LecturaFiel.exe` → **Propiedades**.
+2. En la pestaña General, abajo: marcá **Desbloquear** → Aceptar.
+3. O al abrirlo: **Más información** → **Ejecutar de todas formas**.
+
+Los datos (voces Piper, preferencias) se guardan en `%LOCALAPPDATA%\LecturaFiel`, no al lado del `.exe`, para evitar errores de escritura.
+
 ## Qué incluye este MVP
 
 - **Ingesta de archivos:** PDF, EPUB, TXT y Markdown (arrastrar o elegir)
