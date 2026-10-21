@@ -35,9 +35,15 @@ desktop\run_dev.bat
 
 Requisitos: Python 3, WebView2 Runtime (Windows 10/11 lo trae), `pip install -r desktop\requirements.txt`.
 
-## Versión
+## Versión y actualizaciones
 
-La versión vive en `package.json` (hoy `0.3.0`). Al subir features, aumentala antes de `build.bat`. El resultado queda en `release\v0.3.0\` — así sabés qué carpeta enviar. El título de la ventana y el pie de la UI muestran la misma etiqueta.
+La versión vive en `package.json` (hoy `0.3.0`). Al subir features, aumentala antes de `build.bat`. El resultado queda en `release\v0.3.0\`.
+
+Para que la app avise actualizaciones:
+
+1. Creá un **GitHub Release** en [MauriGonzalez96/LecturaFiel](https://github.com/MauriGonzalez96/LecturaFiel/releases) con tag `v0.3.0` (o la versión que sea).
+2. Adjuntá el asset `LecturaFiel-v0.3.0.exe` (o `LecturaFiel.exe`).
+3. En la app: botón **Buscar actualizaciones** (arriba a la derecha). También chequea sola unos segundos después de abrir; si hay versión nueva, muestra un popup (Actualizar / Ahora no).
 
 ## Qué incluye este MVP
 

@@ -12,6 +12,7 @@ import { FileUpload } from './components/FileUpload'
 import { BookNav } from './components/BookNav'
 import { CloseAppButton } from './components/CloseAppButton'
 import { LibraryShelf } from './components/LibraryShelf'
+import { UpdateChecker } from './components/UpdateChecker'
 import { VoiceStudio } from './components/VoiceStudio'
 import { useLibrary } from './library/useLibrary'
 import { useGlossaryVault } from './glossary/useGlossaryVault'
@@ -191,7 +192,10 @@ export default function App() {
               archiva por libro (sin tope) y se puede descargar en JSON.
             </p>
           </div>
-          <CloseAppButton />
+          <div className="top-actions">
+            <UpdateChecker />
+            <CloseAppButton />
+          </div>
         </div>
       </header>
 
