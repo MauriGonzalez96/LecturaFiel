@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { decisionCache } from '../engine/decisionCache'
 import {
   interventionOptions,
   readInterventionMode,
@@ -10,13 +11,18 @@ export function useInterventionMode() {
   const [mode, setModeState] = useState<InterventionMode>(readInterventionMode)
 
   const setMode = useCallback((next: InterventionMode) => {
-    setModeState(next)
+    setModeState((prev) => {
+      if (prev !== next) decisionCache.clear()
+      return next
+    })
     writeInterventionMode(next)
   }, [])
+
+  const options = useMemo(() => interventionOptions(mode), [mode])
 
   return {
     mode,
     setMode,
-    options: interventionOptions(mode),
+    options,
   }
 }

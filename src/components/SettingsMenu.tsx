@@ -90,7 +90,7 @@ export function SettingsMenu({
             onMouseDown={(e) => e.stopPropagation()}
           >
             <label className="settings-field" htmlFor="intervention-mode">
-              Nivel de reemplazo
+              Nivel de reemplazo (1 fiel → 4 simple)
               <select
                 id="intervention-mode"
                 value={interventionMode}

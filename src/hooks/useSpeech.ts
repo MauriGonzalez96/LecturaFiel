@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { speakRemote, ttsApiAvailable } from '../voices/api'
 import { clampSpeechRate, DEFAULT_SPEECH_RATE } from '../voices/rate'
 import type { VoicePrefs } from '../voices/types'
-import { splitSpeechChunks } from './speechChunks'
+import { splitSpeechChunksDetailed } from './speechChunks'
 
 export type SpeechStatus = 'idle' | 'speaking' | 'paused' | 'unsupported' | 'loading'
 
 export type SpeakOptions = {
   /** Se llama cuando terminó todo el texto (todos los chunks), no si se detuvo. */
   onComplete?: () => void
+  /** Oración desde la que reanudar (0 = inicio). */
+  startSentenceIndex?: number
+  /** Se llama al empezar cada trozo con el índice de oración actual. */
+  onSentence?: (sentenceIndex: number) => void
 }
 
 const VOICE_KEY = 'lectura-fiel:voiceURI'
@@ -247,7 +251,8 @@ export function useSpeech() {
         audioRef.current = null
       }
 
-      const chunks = splitSpeechChunks(clean)
+      const startAt = Math.max(0, options?.startSentenceIndex ?? 0)
+      const chunks = splitSpeechChunksDetailed(clean, undefined, startAt)
       const prefs = readPrefs()
       const rate = clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE)
       const apiOk = await ttsApiAvailable()
@@ -267,10 +272,12 @@ export function useSpeech() {
           await waitIfPaused()
           if (stopRequestedRef.current || session !== sessionRef.current) return
 
+          options?.onSentence?.(chunk.sentenceIndex)
+
           if (useRemote && prefs.voiceId) {
             try {
               await speakRemoteChunk(
-                chunk,
+                chunk.text,
                 prefs.source as 'neural' | 'piper',
                 prefs.voiceId,
                 session,
@@ -278,10 +285,10 @@ export function useSpeech() {
               )
             } catch (err) {
               console.error(err)
-              await speakWindowsChunk(chunk, uri, session, rate)
+              await speakWindowsChunk(chunk.text, uri, session, rate)
             }
           } else {
-            await speakWindowsChunk(chunk, uri, session, rate)
+            await speakWindowsChunk(chunk.text, uri, session, rate)
           }
         }
 

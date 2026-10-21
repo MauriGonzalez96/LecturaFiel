@@ -26,6 +26,11 @@ export interface LexiconEntry {
    * Si falta o es null, no se sustituye: solo glosario.
    */
   preferredSubstitute?: string | null
+  /**
+   * Forma aún más simple (modo 4 — Simple).
+   * Si falta, el motor sintetiza desde preferredSubstitute o la definición.
+   */
+  simpleSubstitute?: string | null
   /** Notas de política (p. ej. "conservar matices"). */
   notes?: string
   /** Decisión por defecto tras evaluación contextual. */

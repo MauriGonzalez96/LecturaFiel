@@ -1,17 +1,25 @@
 /**
- * Nivel de intervención léxica (configuración del usuario).
- * Afecta qué candidatas entran al pipeline de reemplazo / glosario.
+ * Niveles de reemplazo (1 = más fiel, 4 = más simple).
+ * El 4 prioriza las palabras más fáciles y sintetiza la idea.
  */
-export type InterventionMode = 'minimo' | 'medio' | 'completo'
+export type InterventionMode = '1' | '2' | '3' | '4'
 
 export interface InterventionOptions {
-  /** Nivel mínimo del léxico semilla (2 o 3). */
-  minLevel: 2 | 3
-  /** Incluir palabras raras fuera del semilla (solo glosario). */
+  /** Nivel mínimo del léxico semilla a considerar. */
+  minLevel: 1 | 2 | 3
+  /** Incluir palabras raras fuera del semilla. */
   includeRarity: boolean
+  /** Sustituir siempre que haya alternativa (menos glosario-only). */
+  forceSubstitute: boolean
+  /** Preferir la forma más fácil / sintetizar la idea. */
+  preferSimplest: boolean
+  /** Incluir literario/formal (N1) como candidatas. */
+  includeLiterary: boolean
+  /** Id del modo (caché de decisiones). */
+  modeId: InterventionMode
 }
 
-export const DEFAULT_INTERVENTION_MODE: InterventionMode = 'completo'
+export const DEFAULT_INTERVENTION_MODE: InterventionMode = '3'
 
 export const INTERVENTION_OPTIONS: {
   id: InterventionMode
@@ -19,40 +27,85 @@ export const INTERVENTION_OPTIONS: {
   hint: string
 }[] = [
   {
-    id: 'minimo',
-    label: 'Mínimo — solo arcaísmos (N3)',
-    hint: 'Máxima fidelidad: solo palabras muy difíciles o arcaicas.',
+    id: '1',
+    label: '1 — Fiel',
+    hint: 'Casi sin tocar: solo arcaísmos muy difíciles (N3).',
   },
   {
-    id: 'medio',
-    label: 'Medio — poco frecuentes (N2–N3)',
-    hint: 'Léxico semilla N2 y N3, sin detección automática por rareza.',
+    id: '2',
+    label: '2 — Suave',
+    hint: 'Poco frecuentes y arcaísmos del léxico (N2–N3), sin rareza automática.',
   },
   {
-    id: 'completo',
-    label: 'Completo — N2–N3 + rareza',
-    hint: 'Recomendado: incluye también palabras raras fuera del léxico.',
+    id: '3',
+    label: '3 — Claro (recomendado)',
+    hint: 'N2–N3 más palabras raras detectadas; equilibra fidelidad y comprensión.',
+  },
+  {
+    id: '4',
+    label: '4 — Simple',
+    hint: 'Máxima ayuda: palabras lo más fáciles posible y sintetiza la idea (incluye literario).',
   },
 ]
 
 export function interventionOptions(mode: InterventionMode): InterventionOptions {
   switch (mode) {
-    case 'minimo':
-      return { minLevel: 3, includeRarity: false }
-    case 'medio':
-      return { minLevel: 2, includeRarity: false }
-    case 'completo':
+    case '1':
+      return {
+        modeId: '1',
+        minLevel: 3,
+        includeRarity: false,
+        forceSubstitute: false,
+        preferSimplest: false,
+        includeLiterary: false,
+      }
+    case '2':
+      return {
+        modeId: '2',
+        minLevel: 2,
+        includeRarity: false,
+        forceSubstitute: false,
+        preferSimplest: false,
+        includeLiterary: false,
+      }
+    case '4':
+      return {
+        modeId: '4',
+        minLevel: 1,
+        includeRarity: true,
+        forceSubstitute: true,
+        preferSimplest: true,
+        includeLiterary: true,
+      }
+    case '3':
     default:
-      return { minLevel: 2, includeRarity: true }
+      return {
+        modeId: '3',
+        minLevel: 2,
+        includeRarity: true,
+        forceSubstitute: false,
+        preferSimplest: false,
+        includeLiterary: false,
+      }
   }
 }
 
 const STORAGE_KEY = 'lectura-fiel:intervention-mode'
 
+function migrateLegacy(raw: string | null): InterventionMode | null {
+  if (!raw) return null
+  if (raw === '1' || raw === '2' || raw === '3' || raw === '4') return raw
+  // Modos viejos
+  if (raw === 'minimo') return '1'
+  if (raw === 'medio') return '2'
+  if (raw === 'completo') return '3'
+  return null
+}
+
 export function readInterventionMode(): InterventionMode {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === 'minimo' || raw === 'medio' || raw === 'completo') return raw
+    const migrated = migrateLegacy(localStorage.getItem(STORAGE_KEY))
+    if (migrated) return migrated
   } catch {
     /* ignore */
   }

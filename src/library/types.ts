@@ -7,6 +7,11 @@ export interface LibrarySlot {
   book: IngestedBook
   /** Índice de capítulo en el que quedó el lector. */
   chapterIndex: number
+  /**
+   * Oración dentro del capítulo (0 = inicio).
+   * Se actualiza con el audio o al marcar progreso en el texto.
+   */
+  sentenceIndex: number
   /** Timestamp de última lectura / apertura. */
   updatedAt: string
 }

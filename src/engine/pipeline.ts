@@ -41,7 +41,7 @@ export function runPipeline(
     lexicon,
     intervention,
   )
-  const evaluations = evaluateAll(candidates, tokens)
+  const evaluations = evaluateAll(candidates, tokens, intervention)
   const { adaptedText, substitutions, glossary } = applySubstitutions(
     text,
     tokens,

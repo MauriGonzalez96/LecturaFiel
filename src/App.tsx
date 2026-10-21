@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SAMPLE_CHAPTER } from './data/sampleChapter'
 import { runPipeline } from './engine/pipeline'
 import { decisionCache } from './engine/decisionCache'
@@ -39,7 +39,9 @@ export default function App() {
   const active = !showDemo ? library.activeSlot : null
   const book = active?.book ?? null
   const chapterIndex = active?.chapterIndex ?? 0
+  const sentenceIndex = active?.sentenceIndex ?? 0
   const chapterMeta = book?.chapters[chapterIndex]
+  const sentenceSaveTimer = useRef<number | null>(null)
 
   const chapter = showDemo
     ? SAMPLE_CHAPTER.number
@@ -150,6 +152,20 @@ export default function App() {
     setTab('adapted')
     return true
   }
+
+  const setSentenceIndex = library.setSentenceIndex
+  const saveSentenceProgress = useCallback(
+    (index: number) => {
+      if (!book || showDemo) return
+      if (sentenceSaveTimer.current != null) {
+        window.clearTimeout(sentenceSaveTimer.current)
+      }
+      sentenceSaveTimer.current = window.setTimeout(() => {
+        setSentenceIndex(book.id, index)
+      }, 400)
+    },
+    [book, showDemo, setSentenceIndex],
+  )
 
   function goDemo() {
     if (!DEMO_ENABLED) return
@@ -289,9 +305,8 @@ export default function App() {
           )}
 
           <p className="hint">
-            El progreso de lectura se guarda en hasta {MAX_LIBRARY_SLOTS} libros
-            abiertos. El archivo de glosario guarda palabras de todos los libros
-            que hayas leído.
+            Se guarda capítulo y oración (hasta {MAX_LIBRARY_SLOTS} libros). El
+            glosario archiva palabras de todos los libros leídos.
           </p>
         </section>
 
@@ -363,6 +378,10 @@ export default function App() {
                     nextChapterLabel={nextChapterLabel}
                     onAdvanceChapter={advanceChapter}
                     onOpenVoices={() => setTab('voices')}
+                    resumeSentenceIndex={showDemo ? 0 : sentenceIndex}
+                    onSentenceProgress={
+                      showDemo ? undefined : saveSentenceProgress
+                    }
                   />
                 </>
               )}
@@ -386,6 +405,10 @@ export default function App() {
                   <HighlightedText
                     result={result}
                     mode={tab === 'adapted' ? 'adapted' : 'original'}
+                    activeSentenceIndex={showDemo ? 0 : sentenceIndex}
+                    onSentenceVisible={
+                      showDemo ? undefined : saveSentenceProgress
+                    }
                   />
                 )}
               </div>

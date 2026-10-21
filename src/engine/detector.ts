@@ -1,23 +1,26 @@
 import { buildFormIndex, SEED_LEXICON } from '../data/lexicon'
-import type { CandidateMatch, LexiconEntry, TextToken } from '../types/lexicon'
 import type { InterventionOptions } from '../settings/intervention'
+import type { CandidateMatch, LexiconEntry, TextToken } from '../types/lexicon'
 import { looksRare, rarityEntry } from './rarity'
 import { tokenize } from './tokenizer'
 
 export interface DetectResult {
   tokens: TextToken[]
   candidates: CandidateMatch[]
-  /** Candidatas solo por rareza (fuera del léxico semilla). */
   rarityCount: number
 }
 
 const DEFAULT_OPTS: InterventionOptions = {
+  modeId: '3',
   minLevel: 2,
   includeRarity: true,
+  forceSubstitute: false,
+  preferSimplest: false,
+  includeLiterary: false,
 }
 
 /**
- * Etapa 1 — detectar palabras candidatas según umbral de intervención.
+ * Etapa 1 — detectar candidatas según nivel de reemplazo 1–4.
  */
 export function detectCandidates(
   text: string,
@@ -36,6 +39,8 @@ export function detectCandidates(
     const entry = index.get(token.normalized)
     if (entry) {
       if (entry.level < minLevel) return
+      // N1 solo si el modo lo pide (includeLiterary / minLevel 1)
+      if (entry.level === 1 && !opts.includeLiterary && minLevel > 1) return
       candidates.push({ tokenIndex, token, entry })
       return
     }

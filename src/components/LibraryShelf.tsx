@@ -50,6 +50,9 @@ export function LibraryShelf({
                   {hasPages
                     ? `Pág. ${ch?.pageFrom ?? slot.chapterIndex + 1}/${slot.book.chapters.length}`
                     : `Cap. ${slot.chapterIndex + 1}/${slot.book.chapters.length}`}
+                  {(slot.sentenceIndex ?? 0) > 0
+                    ? ` · or. ${(slot.sentenceIndex ?? 0) + 1}`
+                    : ''}
                   {ch?.chapterLabel
                     ? ` · ${truncate(ch.chapterLabel, 28)}`
                     : ch

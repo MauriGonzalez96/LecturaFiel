@@ -2,17 +2,18 @@ import type { DecisionCacheRecord, SubstitutionDecision } from '../types/lexicon
 
 const STORAGE_KEY = 'lectura-fiel:decision-cache'
 
-/** Clave contextual: lema + palabra previa (desambiguación mínima). */
-export function cacheKey(lemma: string, previousWord?: string | null): string {
-  const prev = previousWord?.trim().toLowerCase()
-  if (!prev) return lemma
-  return `${lemma}|${prev}`
+/** Clave: modo|lema|prev — el modo evita mezclar decisiones entre niveles 1–4. */
+export function cacheKey(
+  lemma: string,
+  previousWord?: string | null,
+  modeId?: string,
+): string {
+  const prev = previousWord?.trim().toLowerCase() || ''
+  const mode = modeId || '3'
+  if (!prev) return `${mode}|${lemma}`
+  return `${mode}|${lemma}|${prev}`
 }
 
-/**
- * Guarda decisiones ya tomadas. La clave incluye contexto previo cuando existe,
- * para no congelar un lema polisémico en todos los entornos.
- */
 export class DecisionCache {
   private map = new Map<string, DecisionCacheRecord>()
 
@@ -23,13 +24,9 @@ export class DecisionCache {
   get(
     lemma: string,
     previousWord?: string | null,
+    modeId?: string,
   ): DecisionCacheRecord | undefined {
-    const contextual = cacheKey(lemma, previousWord)
-    const hit = this.map.get(contextual)
-    if (hit) return hit
-    // Compatibilidad con cachés antiguas (solo lema)
-    if (previousWord) return this.map.get(lemma)
-    return undefined
+    return this.map.get(cacheKey(lemma, previousWord, modeId))
   }
 
   set(
@@ -37,8 +34,9 @@ export class DecisionCache {
     decision: SubstitutionDecision,
     substitute?: string | null,
     previousWord?: string | null,
+    modeId?: string,
   ): void {
-    const key = cacheKey(lemma, previousWord)
+    const key = cacheKey(lemma, previousWord, modeId)
     const record: DecisionCacheRecord = {
       lemma: key,
       decision,

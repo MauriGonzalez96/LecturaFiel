@@ -1,10 +1,8 @@
 import type { LexiconEntry } from '../types/lexicon'
 
 /**
- * Léxico semilla: solo términos de niveles 2–3 (y algunos 1 de referencia
- * para demostrar que el motor NO los toca).
- *
- * Prioridad: rareza / dificultad, no formalidad ni longitud.
+ * Léxico semilla (N1 literario, N2 poco frecuente, N3 arcaico/difícil).
+ * preferredSubstitute = modos 1–3; simpleSubstitute = modo 4 (palabras fáciles).
  */
 export const SEED_LEXICON: LexiconEntry[] = [
   // ── Nivel 1: literario / formal vigente → NO sustituir ──────────────────
@@ -13,16 +11,18 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['melancolía', 'melancolia', 'melancólico', 'melancolica', 'melancólica'],
     level: 1,
     definition: 'Tristeza vaga, profunda y sosegada.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'tristeza',
+    simpleSubstitute: 'tristeza',
     defaultDecision: 'preserve',
-    notes: 'Literario habitual; conservar.',
+    notes: 'Literario habitual; conservar (salvo modo Simple).',
   },
   {
     lemma: 'cristalino',
     forms: ['cristalino', 'cristalina', 'cristalinos', 'cristalinas'],
     level: 1,
     definition: 'Claro y transparente como el cristal.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'claro',
+    simpleSubstitute: 'claro',
     defaultDecision: 'preserve',
   },
   {
@@ -30,7 +30,8 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['desolación', 'desolacion', 'desolado', 'desolada'],
     level: 1,
     definition: 'Aflicción grande; estado de algo abandonado o destruido.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'tristeza',
+    simpleSubstitute: 'tristeza',
     defaultDecision: 'preserve',
   },
   {
@@ -38,16 +39,18 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['deplorable', 'deplorables'],
     level: 1,
     definition: 'Digno de ser deplorado; lamentable.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'lamentable',
+    simpleSubstitute: 'muy malo',
     defaultDecision: 'preserve',
-    notes: 'Formal vigente; no simplificar por existir sinónimo más sencillo.',
+    notes: 'Formal vigente; no simplificar salvo modo Simple.',
   },
   {
     lemma: 'pristino',
     forms: ['prístino', 'pristino', 'prístina', 'pristina'],
     level: 1,
     definition: 'Antiguo, primero, original; puro, sin mancha.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'puro',
+    simpleSubstitute: 'puro',
     defaultDecision: 'preserve',
     notes: 'Generalmente conservar; matices importantes.',
   },
@@ -56,7 +59,8 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['paraje', 'parajes'],
     level: 1,
     definition: 'Sitio o lugar, especialmente al aire libre.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'lugar',
+    simpleSubstitute: 'lugar',
     defaultDecision: 'preserve',
   },
 
@@ -68,6 +72,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     definition:
       'Razonamiento que parece correcto, pero contiene un error o se utiliza para engañar o convencer mediante una argumentación defectuosa.',
     preferredSubstitute: 'razonamiento engañoso',
+    simpleSubstitute: 'engaño',
     defaultDecision: 'substitute',
   },
   {
@@ -75,7 +80,8 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['apodíctico', 'apodictico', 'apodíctica', 'apodictica'],
     level: 2,
     definition: 'Que implica o expresa una verdad necesaria o incontestable.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'seguro',
+    simpleSubstitute: 'seguro',
     defaultDecision: 'glossary_only',
     notes: 'Puede requerir explicación más precisa que un sinónimo corto.',
   },
@@ -85,6 +91,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Que no se marchita; imperecedero.',
     preferredSubstitute: 'imperecedero',
+    simpleSubstitute: 'eterno',
     defaultDecision: 'evaluate',
     notes: 'El mejor sustituto depende de qué se esté describiendo.',
   },
@@ -94,6 +101,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Obstinado en la maldad; perverso.',
     preferredSubstitute: 'perverso',
+    simpleSubstitute: 'malo',
     defaultDecision: 'substitute',
   },
   {
@@ -102,6 +110,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Esparcimiento, diversión o alivio del trabajo.',
     preferredSubstitute: 'descanso',
+    simpleSubstitute: 'descanso',
     defaultDecision: 'evaluate',
   },
 
@@ -112,6 +121,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Sin embargo; no obstante.',
     preferredSubstitute: 'sin embargo',
+    simpleSubstitute: 'pero',
     defaultDecision: 'substitute',
   },
   {
@@ -120,6 +130,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'En este año; en la actualidad (arcaico/desusado frente a antaño).',
     preferredSubstitute: 'en la actualidad',
+    simpleSubstitute: 'hoy',
     defaultDecision: 'substitute',
   },
   {
@@ -128,6 +139,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Aunque (arcaísmo).',
     preferredSubstitute: 'aunque',
+    simpleSubstitute: 'aunque',
     defaultDecision: 'substitute',
   },
   {
@@ -136,6 +148,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Bastante, harto (arcaico/literario restringido).',
     preferredSubstitute: 'bastante',
+    simpleSubstitute: 'bastante',
     defaultDecision: 'substitute',
   },
   {
@@ -144,6 +157,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'En cualquier parte.',
     preferredSubstitute: 'dondequiera',
+    simpleSubstitute: 'en cualquier lado',
     defaultDecision: 'substitute',
   },
   {
@@ -152,6 +166,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Masa hojaldrada (forma poco habitual / regional).',
     preferredSubstitute: 'hojaldre',
+    simpleSubstitute: 'masa',
     defaultDecision: 'substitute',
   },
   {
@@ -160,6 +175,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Regalo o anuncio de una buena noticia; ¡enhorabuena!',
     preferredSubstitute: '¡enhorabuena!',
+    simpleSubstitute: '¡qué bien!',
     defaultDecision: 'evaluate',
   },
   {
@@ -168,6 +184,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Hablar (arcaísmo medieval).',
     preferredSubstitute: 'hablar',
+    simpleSubstitute: 'hablar',
     defaultDecision: 'substitute',
   },
   {
@@ -176,6 +193,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Forma arcaica / dialectal poco reconocible; en contexto suele equivaler a «juzgo».',
     preferredSubstitute: 'juzgo',
+    simpleSubstitute: 'creo',
     defaultDecision: 'substitute',
   },
   {
@@ -184,6 +202,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Esencia, punto clave o razón de algo.',
     preferredSubstitute: 'punto clave',
+    simpleSubstitute: 'lo importante',
     defaultDecision: 'evaluate',
   },
 
@@ -193,16 +212,18 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['efímero', 'efimero', 'efímera', 'efimera', 'efímeros', 'efímeras'],
     level: 1,
     definition: 'Pasajero, de corta duración.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'pasajero',
+    simpleSubstitute: 'corto',
     defaultDecision: 'preserve',
-    notes: 'Literario/formal reconocible; conservar.',
+    notes: 'Literario/formal reconocible; conservar (salvo modo Simple).',
   },
   {
     lemma: 'languidez',
     forms: ['languidez', 'lánguido', 'languido', 'lánguida', 'languida'],
     level: 1,
     definition: 'Falta de vigor; flojedad.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'flojedad',
+    simpleSubstitute: 'sin fuerza',
     defaultDecision: 'preserve',
   },
   {
@@ -210,7 +231,8 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['peripecia', 'peripecias'],
     level: 1,
     definition: 'Lance imprevisto; vicisitud.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'imprevisto',
+    simpleSubstitute: 'sorpresa',
     defaultDecision: 'preserve',
   },
   {
@@ -219,6 +241,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Persona aficionada al lujo y a los placeres refinados.',
     preferredSubstitute: 'amante del lujo',
+    simpleSubstitute: 'quien ama el lujo',
     defaultDecision: 'evaluate',
   },
   {
@@ -227,6 +250,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Figura retórica que atribuye cualidades humanas a lo inanimado.',
     preferredSubstitute: null,
+    simpleSubstitute: 'darle vida a cosas',
     defaultDecision: 'glossary_only',
   },
   {
@@ -235,6 +259,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Uso de una palabra en sentido figurado por falta de término propio.',
     preferredSubstitute: null,
+    simpleSubstitute: 'palabra usada por otra',
     defaultDecision: 'glossary_only',
   },
   {
@@ -243,6 +268,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Insignificante, que no llama la atención ni causa efecto.',
     preferredSubstitute: 'insignificante',
+    simpleSubstitute: 'sin importancia',
     defaultDecision: 'evaluate',
   },
   {
@@ -251,6 +277,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Pereza, desidia.',
     preferredSubstitute: 'pereza',
+    simpleSubstitute: 'pereza',
     defaultDecision: 'substitute',
   },
   {
@@ -259,6 +286,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Ofuscar, nublar el entendimiento.',
     preferredSubstitute: 'ofuscar',
+    simpleSubstitute: 'confundir',
     defaultDecision: 'substitute',
   },
   {
@@ -267,8 +295,9 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Extraño, raro; también: viajero a un santuario.',
     preferredSubstitute: null,
+    simpleSubstitute: 'raro',
     defaultDecision: 'glossary_only',
-    notes: 'Polisémica: sin contexto fiable, solo glosario.',
+    notes: 'Polisémica: sin contexto fiable, solo glosario (salvo modo Simple).',
   },
   {
     lemma: 'vituperio',
@@ -276,6 +305,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Censura, insulto o reprobación dura.',
     preferredSubstitute: 'insulto',
+    simpleSubstitute: 'insulto',
     defaultDecision: 'evaluate',
   },
   {
@@ -284,6 +314,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Condenar con dureza; aborrecer.',
     preferredSubstitute: 'condenar',
+    simpleSubstitute: 'rechazar',
     defaultDecision: 'substitute',
   },
 
@@ -294,6 +325,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Así (forma arcaica / popular arcaizante).',
     preferredSubstitute: 'así',
+    simpleSubstitute: 'así',
     defaultDecision: 'substitute',
   },
   {
@@ -302,6 +334,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Por eso; de ahí (arcaísmo). Si forma «por ende», suele ser reconocible.',
     preferredSubstitute: 'por eso',
+    simpleSubstitute: 'por eso',
     defaultDecision: 'evaluate',
     notes: 'No sustituir tras «por» (dejar «por ende»).',
   },
@@ -311,6 +344,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Ahora (arcaísmo; no confundir con el ágora griega).',
     preferredSubstitute: 'ahora',
+    simpleSubstitute: 'ahora',
     defaultDecision: 'substitute',
   },
   {
@@ -319,6 +353,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Mismo (arcaísmo / dialectal).',
     preferredSubstitute: 'mismo',
+    simpleSubstitute: 'mismo',
     defaultDecision: 'substitute',
   },
   {
@@ -327,6 +362,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Desde (arcaísmo).',
     preferredSubstitute: 'desde',
+    simpleSubstitute: 'desde',
     defaultDecision: 'substitute',
   },
   {
@@ -335,6 +371,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Preparar, disponer (arcaísmo).',
     preferredSubstitute: 'preparar',
+    simpleSubstitute: 'preparar',
     defaultDecision: 'substitute',
   },
   {
@@ -343,17 +380,19 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Mirar, considerar (sentido arcaico; hoy suele ser «degustar»).',
     preferredSubstitute: null,
+    simpleSubstitute: 'mirar',
     defaultDecision: 'glossary_only',
-    notes: 'Polisémica moderna vs arcaica; solo glosario.',
+    notes: 'Polisémica moderna vs arcaica; solo glosario (salvo modo Simple).',
   },
   {
     lemma: 'yacer',
     forms: ['yacer', 'yace', 'yacía', 'yacia'],
     level: 1,
     definition: 'Estar echado o sepultado.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'estar',
+    simpleSubstitute: 'estar',
     defaultDecision: 'preserve',
-    notes: 'Literario pero reconocible en epitafios y narrativa.',
+    notes: 'Literario pero reconocible; conservar (salvo modo Simple).',
   },
   {
     lemma: 'faltriquera',
@@ -361,6 +400,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 2,
     definition: 'Bolsillo o bolsa pequeña para llevar dinero u objetos.',
     preferredSubstitute: 'bolsillo',
+    simpleSubstitute: 'bolsillo',
     defaultDecision: 'substitute',
   },
   {
@@ -369,6 +409,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Hornillo portátil.',
     preferredSubstitute: 'hornillo',
+    simpleSubstitute: 'fogón',
     defaultDecision: 'substitute',
   },
   {
@@ -376,7 +417,8 @@ export const SEED_LEXICON: LexiconEntry[] = [
     forms: ['hecatombe', 'hecatombes'],
     level: 1,
     definition: 'Matanza o desastre de gran magnitud.',
-    preferredSubstitute: null,
+    preferredSubstitute: 'desastre',
+    simpleSubstitute: 'desastre',
     defaultDecision: 'preserve',
   },
   {
@@ -385,6 +427,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Canto de victoria.',
     preferredSubstitute: 'canto de victoria',
+    simpleSubstitute: 'canto de ganar',
     defaultDecision: 'substitute',
   },
   {
@@ -393,6 +436,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Canto fúnebre; lamentación.',
     preferredSubstitute: 'canto fúnebre',
+    simpleSubstitute: 'canto triste',
     defaultDecision: 'substitute',
   },
   {
@@ -401,6 +445,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Delator o calumniador interesado.',
     preferredSubstitute: 'calumniador',
+    simpleSubstitute: 'mentiroso',
     defaultDecision: 'substitute',
   },
   {
@@ -409,6 +454,7 @@ export const SEED_LEXICON: LexiconEntry[] = [
     level: 3,
     definition: 'Calle o barrio de mercaderes (histórico / local).',
     preferredSubstitute: null,
+    simpleSubstitute: 'calle de tiendas',
     defaultDecision: 'glossary_only',
   },
 ]

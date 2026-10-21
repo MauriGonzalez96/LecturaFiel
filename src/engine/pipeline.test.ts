@@ -45,16 +45,51 @@ describe('detectCandidates', () => {
     ).toBe(false)
   })
 
-  it('modo mínimo solo admite N3 y sin rareza', () => {
+  it('nivel 1 solo admite N3 y sin rareza', () => {
     const { candidates, rarityCount } = detectCandidates(
       'Empero el sofisma y un hipogrifo.',
       undefined,
-      { minLevel: 3, includeRarity: false },
+      {
+        modeId: '1',
+        minLevel: 3,
+        includeRarity: false,
+        forceSubstitute: false,
+        preferSimplest: false,
+        includeLiterary: false,
+      },
     )
     const lemmas = candidates.map((c) => c.entry.lemma)
     expect(lemmas).toContain('empero')
     expect(lemmas).not.toContain('sofisma')
     expect(rarityCount).toBe(0)
+  })
+})
+
+describe('modo 4 simple', () => {
+  beforeEach(() => {
+    decisionCache.clear()
+  })
+
+  it('usa palabras más fáciles y toca literario', () => {
+    const result = runPipeline(
+      'La melancolía del paraje; empero siguió.',
+      {
+        chapter: 1,
+        intervention: {
+          modeId: '4',
+          minLevel: 1,
+          includeRarity: true,
+          forceSubstitute: true,
+          preferSimplest: true,
+          includeLiterary: true,
+        },
+      },
+    )
+    const lower = result.adaptedText.toLowerCase()
+    expect(lower).toContain('tristeza')
+    expect(lower).toContain('pero')
+    expect(lower).not.toContain('melancolía')
+    expect(lower).not.toContain('empero')
   })
 })
 

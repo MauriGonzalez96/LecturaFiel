@@ -96,6 +96,7 @@ export function useLibrary() {
         slots[existing] = {
           book,
           chapterIndex,
+          sentenceIndex: prevSlot.sentenceIndex ?? 0,
           updatedAt: now,
         }
         return { ...prev, slots, activeBookId: book.id }
@@ -108,6 +109,7 @@ export function useLibrary() {
       const slot: LibrarySlot = {
         book,
         chapterIndex: 0,
+        sentenceIndex: 0,
         updatedAt: now,
       }
       return {
@@ -140,11 +142,27 @@ export function useLibrary() {
                 0,
                 Math.min(chapterIndex, s.book.chapters.length - 1),
               ),
+              sentenceIndex: 0,
               updatedAt: new Date().toISOString(),
             }
           : s,
       ),
       activeBookId: bookId,
+    }))
+  }, [])
+
+  const setSentenceIndex = useCallback((bookId: string, sentenceIndex: number) => {
+    setState((prev) => ({
+      ...prev,
+      slots: prev.slots.map((s) =>
+        s.book.id === bookId
+          ? {
+              ...s,
+              sentenceIndex: Math.max(0, Math.floor(sentenceIndex)),
+              updatedAt: new Date().toISOString(),
+            }
+          : s,
+      ),
     }))
   }, [])
 
@@ -175,6 +193,7 @@ export function useLibrary() {
     addOrOpenBook,
     setActiveBook,
     setChapterIndex,
+    setSentenceIndex,
     removeBook,
     clearLibrary,
     maxSlots: MAX_LIBRARY_SLOTS,

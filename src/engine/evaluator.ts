@@ -1,3 +1,4 @@
+import type { InterventionOptions } from '../settings/intervention'
 import type {
   CandidateMatch,
   LexiconEntry,
@@ -5,6 +6,7 @@ import type {
   TextToken,
 } from '../types/lexicon'
 import { decisionCache } from './decisionCache'
+import { pickSubstitute } from './simplify'
 
 export interface EvaluationResult {
   candidate: CandidateMatch
@@ -14,48 +16,58 @@ export interface EvaluationResult {
   fromCache: boolean
 }
 
+const DEFAULT_OPTS: InterventionOptions = {
+  modeId: '3',
+  minLevel: 2,
+  includeRarity: true,
+  forceSubstitute: false,
+  preferSimplest: false,
+  includeLiterary: false,
+}
+
 /**
  * Etapa 2 — decidir si necesita sustitución (evaluación contextual).
- *
- * Reglas conservadoras:
- * - Si hay decisión en caché (lema + palabra previa) y no es 'evaluate', reutilizarla.
- * - Nivel 3 + substitute preferido → substitute (salvo default glossary_only).
- * - Nivel 2 + default substitute + substitute preferido → substitute.
- * - Sin substitute adecuado → glossary_only (conservar en el texto).
- * - default preserve → preserve (no glosario forzado).
+ * El modo de intervención (1–4) cambia agresividad y simplicidad del reemplazo.
  */
 export function evaluateCandidate(
   candidate: CandidateMatch,
   tokens: TextToken[],
+  opts: InterventionOptions = DEFAULT_OPTS,
 ): EvaluationResult {
   const { entry } = candidate
   const prev = previousWord(tokens, candidate.tokenIndex)
-  const cached = decisionCache.get(entry.lemma, prev)
+  const cached = decisionCache.get(entry.lemma, prev, opts.modeId)
 
   if (cached && cached.decision !== 'evaluate') {
     return {
       candidate,
       decision: cached.decision,
-      substitute: resolveSubstitute(entry, cached.substitute ?? null),
+      substitute: pickSubstitute(
+        entry,
+        opts.preferSimplest,
+        cached.substitute ?? null,
+      ),
       reason: 'Decisión reutilizada desde caché contextual.',
       fromCache: true,
     }
   }
 
   const context = localContext(tokens, candidate.tokenIndex)
-  const decision = resolveDecision(entry, context, prev)
+  const decision = resolveDecision(entry, context, prev, opts)
   const substitute =
-    decision === 'substitute' ? resolveSubstitute(entry, null) : null
+    decision === 'substitute'
+      ? pickSubstitute(entry, opts.preferSimplest, null)
+      : null
 
   if (decision !== 'evaluate') {
-    decisionCache.set(entry.lemma, decision, substitute, prev)
+    decisionCache.set(entry.lemma, decision, substitute, prev, opts.modeId)
   }
 
   return {
     candidate,
     decision,
     substitute,
-    reason: explain(entry, decision),
+    reason: explain(entry, decision, opts),
     fromCache: false,
   }
 }
@@ -63,47 +75,63 @@ export function evaluateCandidate(
 export function evaluateAll(
   candidates: CandidateMatch[],
   tokens: TextToken[],
+  opts: InterventionOptions = DEFAULT_OPTS,
 ): EvaluationResult[] {
-  return candidates.map((c) => evaluateCandidate(c, tokens))
+  return candidates.map((c) => evaluateCandidate(c, tokens, opts))
 }
 
 function resolveDecision(
   entry: LexiconEntry,
   context: string,
   previous: string | null,
+  opts: InterventionOptions,
 ): SubstitutionDecision {
-  if (entry.defaultDecision === 'preserve') return 'preserve'
-
-  if (entry.defaultDecision === 'glossary_only') return 'glossary_only'
-
-  if (entry.defaultDecision === 'substitute') {
-    return entry.preferredSubstitute ? 'substitute' : 'glossary_only'
-  }
-
-  // 'evaluate': heurística contextual
-  if (!entry.preferredSubstitute) return 'glossary_only'
-
-  // «por ende» es expresión vigente → no tocar
-  if (entry.lemma === 'ende' && (previous === 'por' || /\bpor\s+ende\b/.test(context))) {
+  // «por ende» vigente → no tocar (reconocible)
+  if (
+    entry.lemma === 'ende' &&
+    (previous === 'por' || /\bpor\s+ende\b/.test(context))
+  ) {
     return 'preserve'
   }
 
-  // Si el sustituto ya aparece cerca, preferir glosario para no empobrecer.
-  const sub = entry.preferredSubstitute.toLowerCase()
-  if (context.includes(sub)) return 'glossary_only'
+  if (entry.defaultDecision === 'preserve' && !opts.includeLiterary) {
+    return 'preserve'
+  }
 
-  // Nivel 3: inclinación a sustituir; nivel 2: más cautela
+  // Modo 4: literario N1 también se simplifica si hay forma fácil / definición
+  if (entry.defaultDecision === 'preserve' && opts.includeLiterary) {
+    const easy = pickSubstitute(entry, true, null)
+    return easy ? 'substitute' : 'glossary_only'
+  }
+
+  if (entry.defaultDecision === 'glossary_only') {
+    if (opts.forceSubstitute) {
+      const easy = pickSubstitute(entry, opts.preferSimplest, null)
+      return easy ? 'substitute' : 'glossary_only'
+    }
+    return 'glossary_only'
+  }
+
+  if (entry.defaultDecision === 'substitute') {
+    const sub = pickSubstitute(entry, opts.preferSimplest, null)
+    return sub ? 'substitute' : 'glossary_only'
+  }
+
+  // 'evaluate'
+  const sub = pickSubstitute(entry, opts.preferSimplest, null)
+  if (!sub) return 'glossary_only'
+
+  if (!opts.preferSimplest) {
+    const preferred = entry.preferredSubstitute?.toLowerCase()
+    if (preferred && context.includes(preferred)) return 'glossary_only'
+  }
+
+  if (opts.forceSubstitute) return 'substitute'
   if (entry.level >= 3) return 'substitute'
-  if (entry.notes?.toLowerCase().includes('conservar')) return 'glossary_only'
+  if (entry.notes?.toLowerCase().includes('conservar') && !opts.forceSubstitute) {
+    return 'glossary_only'
+  }
   return 'substitute'
-}
-
-function resolveSubstitute(
-  entry: LexiconEntry,
-  override: string | null,
-): string | null {
-  if (override !== null && override !== undefined) return override
-  return entry.preferredSubstitute ?? null
 }
 
 function previousWord(tokens: TextToken[], index: number): string | null {
@@ -127,10 +155,13 @@ function localContext(tokens: TextToken[], index: number): string {
 function explain(
   entry: LexiconEntry,
   decision: SubstitutionDecision,
+  opts: InterventionOptions,
 ): string {
   switch (decision) {
     case 'substitute':
-      return `Nivel ${entry.level}: existe alternativa que conserva el sentido («${entry.preferredSubstitute}»).`
+      return opts.preferSimplest
+        ? `Modo simple: se expresa con palabras más fáciles.`
+        : `Nivel ${entry.level}: alternativa que conserva el sentido.`
     case 'glossary_only':
       return `Nivel ${entry.level}: se conserva en el texto; se explica en el glosario.`
     case 'preserve':

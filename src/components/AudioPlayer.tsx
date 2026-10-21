@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { splitSentences } from '../engine/sentences'
 import { useSpeech, type SpeechStatus } from '../hooks/useSpeech'
 import { useSpeechRate } from '../hooks/useSpeechRate'
 import { SpeechRateControl } from './SpeechRateControl'
@@ -17,6 +18,10 @@ interface Props {
   /** Avanzar y devolver true si hubo avance. */
   onAdvanceChapter?: () => boolean
   onOpenVoices?: () => void
+  /** Oración guardada (0 = inicio). */
+  resumeSentenceIndex?: number
+  /** Persistir oración actual (audio / pausa). */
+  onSentenceProgress?: (sentenceIndex: number) => void
 }
 
 type Source = 'adapted' | 'original'
@@ -43,6 +48,8 @@ export function AudioPlayer({
   nextChapterLabel,
   onAdvanceChapter,
   onOpenVoices,
+  resumeSentenceIndex = 0,
+  onSentenceProgress,
 }: Props) {
   const { status, speak, stop, pause, resume } = useSpeech()
   const { rate, setRate } = useSpeechRate()
@@ -51,6 +58,7 @@ export function AudioPlayer({
   const [prompt, setPrompt] = useState<PromptKind>(null)
   const continueRef = useRef(false)
   const prevChapterRef = useRef(chapterKey)
+  const lastSentenceRef = useRef(resumeSentenceIndex)
   const titleId = useId()
 
   const askRef = useRef(askContinue)
@@ -60,6 +68,8 @@ export function AudioPlayer({
   const originalRef = useRef(originalText)
   const sourceRef = useRef(source)
   const speakRef = useRef(speak)
+  const progressRef = useRef(onSentenceProgress)
+  const resumeIdxRef = useRef(resumeSentenceIndex)
 
   askRef.current = askContinue
   hasNextRef.current = hasNextChapter
@@ -68,6 +78,9 @@ export function AudioPlayer({
   originalRef.current = originalText
   sourceRef.current = source
   speakRef.current = speak
+  progressRef.current = onSentenceProgress
+  resumeIdxRef.current = resumeSentenceIndex
+  lastSentenceRef.current = resumeSentenceIndex
 
   useEffect(() => {
     try {
@@ -77,7 +90,13 @@ export function AudioPlayer({
     }
   }, [askContinue])
 
+  function reportSentence(index: number) {
+    lastSentenceRef.current = index
+    progressRef.current?.(index)
+  }
+
   function onPlaybackComplete() {
+    reportSentence(0)
     if (!askRef.current) return
     if (hasNextRef.current && advanceFnRef.current) {
       setPrompt('next')
@@ -86,7 +105,7 @@ export function AudioPlayer({
     setPrompt('finished')
   }
 
-  // Tras confirmar y avanzar, seguir leyendo el texto nuevo.
+  // Tras confirmar y avanzar, seguir leyendo el texto nuevo desde el inicio.
   useEffect(() => {
     if (prevChapterRef.current === chapterKey) return
     prevChapterRef.current = chapterKey
@@ -97,7 +116,11 @@ export function AudioPlayer({
         ? adaptedRef.current
         : originalRef.current
     if (!text.trim()) return
-    void speakRef.current(text, { onComplete: onPlaybackComplete })
+    void speakRef.current(text, {
+      startSentenceIndex: 0,
+      onSentence: reportSentence,
+      onComplete: onPlaybackComplete,
+    })
   }, [chapterKey, adaptedText, originalText])
 
   function acceptContinue() {
@@ -121,15 +144,26 @@ export function AudioPlayer({
     )
   }
 
-  function play(next: Source) {
+  function play(next: Source, fromStart = false) {
     setSource(next)
     continueRef.current = false
     setPrompt(null)
     const text = next === 'adapted' ? adaptedText : originalText
-    void speak(text, { onComplete: onPlaybackComplete })
+    const startAt = fromStart ? 0 : Math.max(0, resumeIdxRef.current)
+    void speak(text, {
+      startSentenceIndex: startAt,
+      onSentence: reportSentence,
+      onComplete: onPlaybackComplete,
+    })
+  }
+
+  function handlePause() {
+    reportSentence(lastSentenceRef.current)
+    pause()
   }
 
   function handleStop() {
+    reportSentence(lastSentenceRef.current)
     continueRef.current = false
     setPrompt(null)
     stop()
@@ -138,6 +172,11 @@ export function AudioPlayer({
   const where =
     currentLabel?.trim() ||
     (hasNextChapter ? 'este capítulo' : 'el último capítulo')
+
+  const sentenceCount = splitSentences(
+    source === 'adapted' ? adaptedText : originalText,
+  ).length
+  const canResume = resumeSentenceIndex > 0 && resumeSentenceIndex < sentenceCount
 
   return (
     <>
@@ -157,7 +196,7 @@ export function AudioPlayer({
             <button
               type="button"
               className="icon-btn"
-              onClick={pause}
+              onClick={handlePause}
               title="Pausa"
               aria-label="Pausa"
               disabled={status === 'loading'}
@@ -168,9 +207,13 @@ export function AudioPlayer({
             <button
               type="button"
               className="icon-btn primary"
-              onClick={() => play('adapted')}
+              onClick={() => play('adapted', false)}
               disabled={!adaptedText.trim()}
-              title="Reproducir texto adaptado"
+              title={
+                canResume
+                  ? `Continuar desde la oración ${resumeSentenceIndex + 1}`
+                  : 'Reproducir texto adaptado'
+              }
               aria-label="Reproducir adaptado"
             >
               <IconPlay />
@@ -191,7 +234,7 @@ export function AudioPlayer({
           <button
             type="button"
             className="btn ghost audio-src"
-            onClick={() => play('adapted')}
+            onClick={() => play('adapted', false)}
             disabled={!adaptedText.trim() || status === 'loading'}
             title="Escuchar versión adaptada"
           >
@@ -200,12 +243,22 @@ export function AudioPlayer({
           <button
             type="button"
             className="btn ghost audio-src"
-            onClick={() => play('original')}
+            onClick={() => play('original', false)}
             disabled={!originalText.trim() || status === 'loading'}
             title="Escuchar original"
           >
             Original
           </button>
+          {canResume && status === 'idle' && (
+            <button
+              type="button"
+              className="btn ghost audio-src"
+              onClick={() => play(source, true)}
+              title="Empezar el capítulo desde la primera oración"
+            >
+              Desde el inicio
+            </button>
+          )}
 
           {onOpenVoices && (
             <button
@@ -238,7 +291,11 @@ export function AudioPlayer({
           disabled={status === 'loading'}
         />
 
-        <StatusDot status={status} />
+        <StatusDot
+          status={status}
+          sentenceIndex={resumeSentenceIndex}
+          sentenceCount={sentenceCount}
+        />
       </div>
 
       {prompt === 'next' && (
@@ -316,13 +373,32 @@ export function AudioPlayer({
   )
 }
 
-function StatusDot({ status }: { status: SpeechStatus }) {
-  if (status === 'idle') return null
+function StatusDot({
+  status,
+  sentenceIndex,
+  sentenceCount,
+}: {
+  status: SpeechStatus
+  sentenceIndex: number
+  sentenceCount: number
+}) {
+  if (status === 'idle') {
+    if (sentenceIndex > 0 && sentenceCount > 0) {
+      return (
+        <span className="audio-status status-idle" aria-live="polite">
+          Guardado · oración {sentenceIndex + 1}/{sentenceCount}
+        </span>
+      )
+    }
+    return null
+  }
   const label =
     status === 'loading'
       ? 'Preparando voz…'
       : status === 'speaking'
-        ? 'Reproduciendo…'
+        ? sentenceCount > 0
+          ? `Reproduciendo · oración ${Math.min(sentenceIndex + 1, sentenceCount)}/${sentenceCount}`
+          : 'Reproduciendo…'
         : 'En pausa'
   return (
     <span className={`audio-status status-${status}`} aria-live="polite">

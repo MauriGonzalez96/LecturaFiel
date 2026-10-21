@@ -33,7 +33,18 @@ export async function loadLibraryState(): Promise<LibraryState | null> {
       const req = tx.objectStore(STORE).get(KEY)
       req.onsuccess = () => {
         const value = req.result as LibraryState | undefined
-        resolve(value?.version === 1 ? value : null)
+        if (!value || value.version !== 1) {
+          resolve(null)
+          return
+        }
+        // Migración suave: slots viejos sin sentenceIndex
+        resolve({
+          ...value,
+          slots: value.slots.map((s) => ({
+            ...s,
+            sentenceIndex: typeof s.sentenceIndex === 'number' ? s.sentenceIndex : 0,
+          })),
+        })
       }
       req.onerror = () => reject(req.error)
     })

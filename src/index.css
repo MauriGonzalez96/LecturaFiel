@@ -1178,6 +1178,17 @@ textarea {
   color: var(--ink);
 }
 
+.reader-sentence {
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.reader-sentence.is-active {
+  background: rgba(15, 122, 108, 0.14);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .hl {
   padding: 0.05em 0.12em;
   border-radius: 3px;
