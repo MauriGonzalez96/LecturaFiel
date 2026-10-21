@@ -1,0 +1,19 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vscode/*
+!.vscode/extensions.json
+tsconfig.tsbuildinfo
+
+# Desktop / PyInstaller
+desktop/static_front/
+desktop/build/
+desktop/dist/
+desktop/data/
+desktop/_test_piper/
+desktop/__pycache__/
+**/__pycache__/
+*.pyc
+release/
+*.spec.bak
