@@ -15,6 +15,8 @@ interface Props {
   demoEnabled?: boolean
   interventionMode: InterventionMode
   onInterventionMode: (mode: InterventionMode) => void
+  /** Tras elegir nivel: cierra el menú y confirma en pantalla. */
+  onInterventionApplied?: (mode: InterventionMode) => void
 }
 
 /** Tuerca de configuración (voces, updates, caché, demo, cerrar). */
@@ -25,6 +27,7 @@ export function SettingsMenu({
   demoEnabled = false,
   interventionMode,
   onInterventionMode,
+  onInterventionApplied,
 }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -94,9 +97,12 @@ export function SettingsMenu({
               <select
                 id="intervention-mode"
                 value={interventionMode}
-                onChange={(e) =>
-                  onInterventionMode(e.target.value as InterventionMode)
-                }
+                onChange={(e) => {
+                  const next = e.target.value as InterventionMode
+                  onInterventionMode(next)
+                  onInterventionApplied?.(next)
+                  setOpen(false)
+                }}
               >
                 {INTERVENTION_OPTIONS.map((opt) => (
                   <option key={opt.id} value={opt.id}>
@@ -110,6 +116,10 @@ export function SettingsMenu({
                 INTERVENTION_OPTIONS.find((o) => o.id === interventionMode)
                   ?.hint
               }
+            </p>
+            <p className="settings-hint settings-hint-strong">
+              Al cambiar, se reaplica al texto al instante. Mirá «sustituidas»
+              y la columna «Se lee».
             </p>
           </div>
 

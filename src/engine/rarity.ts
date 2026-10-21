@@ -3,14 +3,34 @@ import {
   RARITY_MIN_LENGTH,
   stripDiacritics,
 } from '../data/commonSpanish'
+import { lookupEasySynonym } from '../data/easySynonyms'
 import type { LexiconEntry, TextToken } from '../types/lexicon'
 
 /**
- * Entrada sintética para palabras raras fuera del léxico semilla.
- * Política conservadora: solo glosario (nunca sustituir sin alternativa curada).
+ * Entrada para palabras fuera del léxico semilla.
+ * Si hay sinónimo fácil curado → se puede sustituir.
+ * Si no → solo glosario (nunca inventar «palabra poco frecuente»).
  */
 export function rarityEntry(normalized: string): LexiconEntry {
   const lemma = stripDiacritics(normalized)
+  const easy = lookupEasySynonym(normalized)
+
+  if (easy) {
+    return {
+      lemma,
+      forms: [normalized],
+      level: 2,
+      definition:
+        easy.definition ??
+        `Forma más clara sugerida: «${easy.simple}».`,
+      preferredSubstitute: easy.preferred,
+      simpleSubstitute: easy.simple,
+      defaultDecision: 'substitute',
+      synthetic: false,
+      notes: 'Sinónimo fácil (mapa de rareza).',
+    }
+  }
+
   return {
     lemma,
     forms: [normalized],
@@ -39,7 +59,6 @@ export function isLikelyProperNoun(
   for (let i = index - 1; i >= 0; i--) {
     const prev = tokens[i]!
     if (prev.isWord) {
-      // Tras otra palabra en la misma oración → mayúscula suele ser nombre propio
       return true
     }
     if (/[.!?…»]/.test(prev.raw)) return false
@@ -49,7 +68,6 @@ export function isLikelyProperNoun(
 
 /**
  * ¿Debe considerarse candidata por rareza?
- * Conservador: longitud mínima, no frecuente, no nombre propio probable.
  */
 export function looksRare(
   token: TextToken,

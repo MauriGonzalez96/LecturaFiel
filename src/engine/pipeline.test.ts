@@ -112,6 +112,29 @@ describe('modo 4 simple', () => {
     )
     expect(result.adaptedText.toLowerCase()).toContain('hipogrifo')
   })
+
+  it('modo 4 sustituye rareza con sinónimo fácil conocido', () => {
+    const result = runPipeline(
+      'La planificación y la hostilidad no bastan; encubren el problema.',
+      {
+        chapter: 1,
+        intervention: {
+          modeId: '4',
+          minLevel: 1,
+          includeRarity: true,
+          forceSubstitute: true,
+          preferSimplest: true,
+          includeLiterary: true,
+        },
+      },
+    )
+    const lower = result.adaptedText.toLowerCase()
+    expect(lower).toContain('plan')
+    expect(lower).toContain('odio')
+    expect(lower).toContain('esconden')
+    expect(lower).not.toContain('planificación')
+    expect(result.stats.substituted).toBeGreaterThan(0)
+  })
 })
 
 describe('runPipeline', () => {

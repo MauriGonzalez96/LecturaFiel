@@ -6,6 +6,8 @@ import { HighlightedText } from './components/HighlightedText'
 import { GlossaryPanel } from './components/GlossaryPanel'
 import { GlossaryQuiz } from './components/GlossaryQuiz'
 import { StatsBar } from './components/StatsBar'
+import { InterventionNotice } from './components/InterventionNotice'
+import type { InterventionMode } from './settings/intervention'
 import { AudioPlayer } from './components/AudioPlayer'
 import { ChangeLog } from './components/ChangeLog'
 import { FileUpload } from './components/FileUpload'
@@ -35,6 +37,9 @@ export default function App() {
   const [cacheTick, setCacheTick] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [seekNonce, setSeekNonce] = useState(0)
+  const [levelNotice, setLevelNotice] = useState(false)
+  const [readerFlash, setReaderFlash] = useState(false)
+  const prevModeRef = useRef(intervention.mode)
 
   const showDemo = DEMO_ENABLED && demoMode
   const active = !showDemo ? library.activeSlot : null
@@ -74,6 +79,24 @@ export default function App() {
       intervention: intervention.options,
     })
   }, [text, chapter, cacheTick, showDemo, intervention.options])
+
+  // Feedback visible al cambiar nivel (el pipeline ya se recalcula)
+  useEffect(() => {
+    if (prevModeRef.current === intervention.mode) return
+    prevModeRef.current = intervention.mode
+    setLevelNotice(true)
+    setReaderFlash(true)
+    const t = window.setTimeout(() => setReaderFlash(false), 900)
+    return () => window.clearTimeout(t)
+  }, [intervention.mode])
+
+  function applyInterventionMode(mode: InterventionMode) {
+    intervention.setMode(mode)
+    setCacheTick((n) => n + 1)
+    setLevelNotice(true)
+    setReaderFlash(true)
+    window.setTimeout(() => setReaderFlash(false), 900)
+  }
 
   // Persistir glosario del capítulo en el archivo por libro
   useEffect(() => {
@@ -237,7 +260,11 @@ export default function App() {
               onDemo={DEMO_ENABLED ? goDemo : undefined}
               demoEnabled={DEMO_ENABLED}
               interventionMode={intervention.mode}
-              onInterventionMode={intervention.setMode}
+              onInterventionMode={applyInterventionMode}
+              onInterventionApplied={() => {
+                setLevelNotice(true)
+                setTab('read')
+              }}
             />
           </div>
         </div>
@@ -379,7 +406,18 @@ export default function App() {
               {/* Audio queda montado también en Glosario para no cortar la lectura */}
               {tab !== 'review' && !emptyProduction && (
                 <>
-                  {tab !== 'glossary' && <StatsBar result={result} />}
+                  {tab !== 'glossary' && (
+                    <StatsBar result={result} mode={intervention.mode} />
+                  )}
+                  {tab !== 'glossary' && levelNotice && (
+                    <InterventionNotice
+                      mode={intervention.mode}
+                      substituted={result.stats.substituted}
+                      rarity={result.stats.rarityDetected}
+                      glossaryOnly={result.stats.glossaryOnly}
+                      onDismiss={() => setLevelNotice(false)}
+                    />
+                  )}
                   {tab !== 'glossary' && (
                     <ChangeLog substitutions={result.substitutions} />
                   )}
@@ -401,7 +439,9 @@ export default function App() {
                 </>
               )}
 
-              <div className="result-body">
+              <div
+                className={`result-body${readerFlash ? ' reader-flash' : ''}`}
+              >
                 {tab === 'glossary' ? (
                   <GlossaryPanel
                     bookItems={bookGlossary}

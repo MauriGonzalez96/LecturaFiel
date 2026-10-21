@@ -29,22 +29,22 @@ export const INTERVENTION_OPTIONS: {
   {
     id: '1',
     label: '1 — Fiel',
-    hint: 'Casi sin tocar: solo arcaísmos muy difíciles (N3).',
+    hint: 'Casi sin tocar: solo arcaísmos N3 del léxico. Sin rareza automática.',
   },
   {
     id: '2',
     label: '2 — Suave',
-    hint: 'Poco frecuentes y arcaísmos del léxico (N2–N3), sin rareza automática.',
+    hint: 'Léxico N2–N3. Sin rareza automática (el texto cambia poco si no hay arcaísmos).',
   },
   {
     id: '3',
     label: '3 — Claro (recomendado)',
-    hint: 'N2–N3 más palabras raras detectadas; equilibra fidelidad y comprensión.',
+    hint: 'Sustituye si hay sinónimo conocido; el resto raro va al glosario sin cambiar el texto.',
   },
   {
     id: '4',
     label: '4 — Simple',
-    hint: 'Máxima ayuda: palabras lo más fáciles posible y sintetiza la idea (incluye literario).',
+    hint: 'Máxima ayuda: sinónimos lo más fáciles posible (incluye literario). Mirá la columna «Se lee».',
   },
 ]
 

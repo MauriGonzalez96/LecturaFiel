@@ -1164,6 +1164,88 @@ textarea {
   color: var(--ink-soft);
 }
 
+.stats-mode {
+  background: rgba(15, 122, 108, 0.1);
+  border-radius: 8px;
+  padding: 0.25rem 0.4rem;
+}
+
+.stats-mode strong {
+  color: rgb(15, 122, 108);
+}
+
+.stats-hot strong {
+  color: rgb(15, 122, 108);
+}
+
+.intervention-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 122, 108, 0.35);
+  background: rgba(15, 122, 108, 0.1);
+  animation: notice-in 0.25s ease;
+}
+
+.intervention-notice-body {
+  min-width: 0;
+}
+
+.intervention-notice-body strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.intervention-notice-body p {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.intervention-notice-hint {
+  font-size: 0.78rem !important;
+  opacity: 0.9;
+}
+
+.settings-hint-strong {
+  margin-top: 0.35rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.reader-flash .dual-reader {
+  animation: reader-pulse 0.85s ease;
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reader-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(15, 122, 108, 0);
+  }
+  35% {
+    box-shadow: 0 0 0 3px rgba(15, 122, 108, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(15, 122, 108, 0);
+  }
+}
+
 .result-body {
   min-height: 200px;
 }
