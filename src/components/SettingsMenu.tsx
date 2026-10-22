@@ -17,6 +17,8 @@ interface Props {
   onInterventionMode: (mode: InterventionMode) => void
   /** Tras elegir nivel: cierra el menú y confirma en pantalla. */
   onInterventionApplied?: (mode: InterventionMode) => void
+  onOpenEveryday?: () => void
+  everydayCount?: number
 }
 
 /** Tuerca de configuración (voces, updates, caché, demo, cerrar). */
@@ -28,6 +30,8 @@ export function SettingsMenu({
   interventionMode,
   onInterventionMode,
   onInterventionApplied,
+  onOpenEveryday,
+  everydayCount = 0,
 }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -124,6 +128,18 @@ export function SettingsMenu({
           </div>
 
           <div className="settings-sep" role="separator" />
+
+          {onOpenEveryday && (
+            <button
+              type="button"
+              role="menuitem"
+              className="settings-item"
+              onClick={() => run(onOpenEveryday)}
+            >
+              Vocabulario cotidiano
+              {everydayCount > 0 ? ` (${everydayCount})` : ''}
+            </button>
+          )}
 
           <button
             type="button"

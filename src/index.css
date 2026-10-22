@@ -1526,6 +1526,86 @@ textarea {
   color: var(--ink-soft);
 }
 
+.change-keep,
+.glossary-keep {
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.45rem;
+}
+
+.everyday-panel {
+  padding: 0.25rem 0 1rem;
+}
+
+.everyday-panel-head h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.everyday-panel-head p {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.everyday-add {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.everyday-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.everyday-msg {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  color: rgb(15, 122, 108);
+}
+
+.everyday-empty {
+  margin: 0.75rem 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.everyday-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: min(50vh, 420px);
+  overflow: auto;
+}
+
+.everyday-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.everyday-list li span {
+  font-weight: 600;
+}
+
+.everyday-clear {
+  margin-top: 0.75rem;
+}
+
 .change-log .lvl {
   margin-left: auto;
   font-size: 0.75rem;

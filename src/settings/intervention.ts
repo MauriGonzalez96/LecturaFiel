@@ -29,22 +29,22 @@ export const INTERVENTION_OPTIONS: {
   {
     id: '1',
     label: '1 — Fiel',
-    hint: 'Casi sin tocar: solo arcaísmos N3 del léxico. Sin rareza automática.',
+    hint: 'Solo arcaísmos del diccionario interno (N3). No escanea el capítulo entero.',
   },
   {
     id: '2',
     label: '2 — Suave',
-    hint: 'Léxico N2–N3. Sin rareza automática (el texto cambia poco si no hay arcaísmos).',
+    hint: 'Léxico N2–N3. Aún no busca palabras fuera del uso cotidiano.',
   },
   {
     id: '3',
     label: '3 — Claro (recomendado)',
-    hint: 'Sustituye si hay sinónimo conocido; el resto raro va al glosario sin cambiar el texto.',
+    hint: 'Por capítulo: busca lo que no es cotidiano; reemplaza si hay sinónimo, si no → glosario.',
   },
   {
     id: '4',
     label: '4 — Simple',
-    hint: 'Máxima ayuda: sinónimos lo más fáciles posible (incluye literario). Mirá la columna «Se lee».',
+    hint: 'Igual que Claro, con las palabras más fáciles posibles (incluye literario).',
   },
 ]
 

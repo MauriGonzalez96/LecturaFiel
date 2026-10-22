@@ -1,8 +1,10 @@
 import type { LexiconEntry } from '../types/lexicon'
+import { ARCHAISM_LEXICON } from './archaisms'
 
 /**
  * Léxico semilla (N1 literario, N2 poco frecuente, N3 arcaico/difícil).
  * preferredSubstitute = modos 1–3; simpleSubstitute = modo 4 (palabras fáciles).
+ * Los arcaísmos ampliados viven en archaisms.ts y se fusionan al final.
  */
 export const SEED_LEXICON: LexiconEntry[] = [
   // ── Nivel 1: literario / formal vigente → NO sustituir ──────────────────
@@ -457,6 +459,9 @@ export const SEED_LEXICON: LexiconEntry[] = [
     simpleSubstitute: 'calle de tiendas',
     defaultDecision: 'glossary_only',
   },
+
+  // Arcaísmos ampliados (concepto → español actual / simple)
+  ...ARCHAISM_LEXICON,
 ]
 
 /** Índice rápido forma normalizada → entrada. */

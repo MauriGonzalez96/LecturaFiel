@@ -28,9 +28,9 @@ export function StatsBar({ result, mode }: Props) {
         <strong>{s.candidatesFound}</strong>
         <span>candidatas</span>
       </div>
-      <div>
+      <div title="Palabras del capítulo que no están en el vocabulario cotidiano">
         <strong>{s.rarityDetected}</strong>
-        <span>por rareza</span>
+        <span>fuera cotidiano</span>
       </div>
       <div className={s.substituted > 0 ? 'stats-hot' : undefined}>
         <strong>{s.substituted}</strong>

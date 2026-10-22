@@ -1,3 +1,4 @@
+import { isUserEveryday } from '../data/userEveryday'
 import { buildFormIndex, SEED_LEXICON } from '../data/lexicon'
 import type { InterventionOptions } from '../settings/intervention'
 import type { CandidateMatch, LexiconEntry, TextToken } from '../types/lexicon'
@@ -20,7 +21,10 @@ const DEFAULT_OPTS: InterventionOptions = {
 }
 
 /**
- * Etapa 1 — detectar candidatas según nivel de reemplazo 1–4.
+ * Etapa 1 — por capítulo:
+ * 1) léxico/arcaísmos conocidos
+ * 2) si el modo lo permite: palabras fuera del uso cotidiano
+ *    (se «buscan» por exclusión de la lista cotidiana y se resuelve sinónimo)
  */
 export function detectCandidates(
   text: string,
@@ -36,15 +40,18 @@ export function detectCandidates(
   tokens.forEach((token, tokenIndex) => {
     if (!token.isWord) return
 
+    // El usuario la marcó como cotidiana → nunca tocar
+    if (isUserEveryday(token.normalized)) return
+
     const entry = index.get(token.normalized)
     if (entry) {
       if (entry.level < minLevel) return
-      // N1 solo si el modo lo pide (includeLiterary / minLevel 1)
       if (entry.level === 1 && !opts.includeLiterary && minLevel > 1) return
       candidates.push({ tokenIndex, token, entry })
       return
     }
 
+    // Buscar fuera del vocabulario cotidiano del lector
     if (!opts.includeRarity) return
     if (!looksRare(token, tokens, tokenIndex)) return
     rarityCount += 1

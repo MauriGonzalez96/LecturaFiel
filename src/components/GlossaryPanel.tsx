@@ -14,6 +14,8 @@ interface Props {
   onDownload?: () => void
   onImportFile?: (file: File) => void | Promise<void>
   onRemoveArchiveBook?: (bookId: string) => void
+  /** Marcar lema como cotidiano (no se vuelve a tocar). */
+  onKeepEveryday?: (word: string) => void
 }
 
 export type Scope = 'book' | 'general'
@@ -26,6 +28,7 @@ export function GlossaryPanel({
   onDownload,
   onImportFile,
   onRemoveArchiveBook,
+  onKeepEveryday,
 }: Props) {
   const [scope, setScope] = useState<Scope>(initialScope)
   const [popupError, setPopupError] = useState<string | null>(null)
@@ -137,6 +140,7 @@ export function GlossaryPanel({
           <GlossaryList
             items={bookItems}
             empty="Todavía no hay entradas en este libro. Aparecen al leer capítulos con vocabulario difícil."
+            onKeepEveryday={onKeepEveryday}
           />
         </>
       ) : (
@@ -176,6 +180,7 @@ export function GlossaryPanel({
                   <GlossaryList
                     items={book.entries}
                     empty="Sin entradas en este libro."
+                    onKeepEveryday={onKeepEveryday}
                   />
                 </section>
               ))}
@@ -190,9 +195,11 @@ export function GlossaryPanel({
 function GlossaryList({
   items,
   empty,
+  onKeepEveryday,
 }: {
   items: GlossaryItem[]
   empty: string
+  onKeepEveryday?: (word: string) => void
 }) {
   if (items.length === 0) {
     return (
@@ -224,6 +231,16 @@ function GlossaryList({
             <span className="label">Frase original · cap. {item.chapter}</span>
             «{item.originalSentence}»
           </p>
+          {onKeepEveryday && (
+            <button
+              type="button"
+              className="btn ghost glossary-keep"
+              onClick={() => onKeepEveryday(item.word)}
+              title="Agregar a mi vocabulario cotidiano"
+            >
+              Es cotidiana
+            </button>
+          )}
         </li>
       ))}
     </ul>

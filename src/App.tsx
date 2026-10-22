@@ -7,6 +7,7 @@ import { GlossaryPanel } from './components/GlossaryPanel'
 import { GlossaryQuiz } from './components/GlossaryQuiz'
 import { StatsBar } from './components/StatsBar'
 import { InterventionNotice } from './components/InterventionNotice'
+import { EverydayVocabPanel } from './components/EverydayVocabPanel'
 import type { InterventionMode } from './settings/intervention'
 import { AudioPlayer } from './components/AudioPlayer'
 import { ChangeLog } from './components/ChangeLog'
@@ -18,18 +19,20 @@ import { VoiceStudio } from './components/VoiceStudio'
 import { useLibrary } from './library/useLibrary'
 import { useGlossaryVault } from './glossary/useGlossaryVault'
 import { useInterventionMode } from './hooks/useInterventionMode'
+import { useUserEveryday } from './hooks/useUserEveryday'
 import { useVoiceSettings } from './hooks/useVoiceSettings'
 import { MAX_LIBRARY_SLOTS } from './library/types'
 import { DEMO_ENABLED } from './env'
 import type { IngestedBook } from './ingest/types'
 import { APP_VERSION_LABEL } from './version'
 
-type Tab = 'read' | 'glossary' | 'review' | 'voices'
+type Tab = 'read' | 'glossary' | 'review' | 'voices' | 'everyday'
 
 export default function App() {
   const library = useLibrary()
   const glossaryVault = useGlossaryVault()
   const intervention = useInterventionMode()
+  const userEveryday = useUserEveryday()
   useVoiceSettings()
   const [demoMode, setDemoMode] = useState(DEMO_ENABLED)
   const [demoText, setDemoText] = useState(SAMPLE_CHAPTER.text)
@@ -78,7 +81,13 @@ export default function App() {
       chapter,
       intervention: intervention.options,
     })
-  }, [text, chapter, cacheTick, showDemo, intervention.options])
+  }, [text, chapter, cacheTick, showDemo, intervention.options, userEveryday.words])
+
+  function keepEveryday(word: string) {
+    userEveryday.add(word)
+    decisionCache.clear()
+    setCacheTick((n) => n + 1)
+  }
 
   // Feedback visible al cambiar nivel (el pipeline ya se recalcula)
   useEffect(() => {
@@ -265,6 +274,8 @@ export default function App() {
                 setLevelNotice(true)
                 setTab('read')
               }}
+              onOpenEveryday={() => setTab('everyday')}
+              everydayCount={userEveryday.count}
             />
           </div>
         </div>
@@ -347,8 +358,16 @@ export default function App() {
           )}
 
           <p className="hint">
-            Se guarda capítulo y oración (hasta {MAX_LIBRARY_SLOTS} libros). El
-            glosario archiva palabras de todos los libros leídos.
+            En niveles 3–4 se busca lo que no es cotidiano. Podés{' '}
+            <button
+              type="button"
+              className="linkish"
+              onClick={() => setTab('everyday')}
+            >
+              agregar palabras a tu lista
+            </button>{' '}
+            para que no se cambien. Hasta {MAX_LIBRARY_SLOTS} libros · glosario
+            archivado.
           </p>
         </section>
 
@@ -357,17 +376,25 @@ export default function App() {
             <h2>
               {tab === 'voices'
                 ? 'Estudio de voces'
-                : tab === 'glossary' && emptyProduction
-                  ? 'Archivo de glosario'
-                  : emptyProduction
-                    ? 'Esperando un libro'
-                    : title || `Capítulo ${chapter}`}
+                : tab === 'everyday'
+                  ? 'Vocabulario cotidiano'
+                  : tab === 'glossary' && emptyProduction
+                    ? 'Archivo de glosario'
+                    : emptyProduction
+                      ? 'Esperando un libro'
+                      : title || `Capítulo ${chapter}`}
             </h2>
             <div className="tabs" role="tablist">
               {(
                 [
                   ['read', 'Texto'],
                   ['glossary', `Glosario (${glossaryTabCount})`],
+                  [
+                    'everyday',
+                    userEveryday.count > 0
+                      ? `Cotidianas (${userEveryday.count})`
+                      : 'Cotidianas',
+                  ],
                   ['review', 'Repaso'],
                 ] as const
               ).map(([id, label]) => (
@@ -387,6 +414,17 @@ export default function App() {
 
           {tab === 'voices' ? (
             <VoiceStudio onClose={() => setTab('read')} />
+          ) : tab === 'everyday' ? (
+            <EverydayVocabPanel
+              words={userEveryday.words}
+              onAdd={userEveryday.add}
+              onRemove={userEveryday.remove}
+              onClear={userEveryday.clear}
+              onChanged={() => {
+                decisionCache.clear()
+                setCacheTick((n) => n + 1)
+              }}
+            />
           ) : emptyProduction && tab !== 'glossary' ? (
             <p className="empty-panel">
               Cuando cargues un libro vas a ver el texto adaptado, el glosario y
@@ -419,7 +457,10 @@ export default function App() {
                     />
                   )}
                   {tab !== 'glossary' && (
-                    <ChangeLog substitutions={result.substitutions} />
+                    <ChangeLog
+                      substitutions={result.substitutions}
+                      onKeepEveryday={keepEveryday}
+                    />
                   )}
                   <AudioPlayer
                     adaptedText={result.adaptedText}
@@ -453,6 +494,7 @@ export default function App() {
                     onRemoveArchiveBook={(id) =>
                       void glossaryVault.removeBook(id)
                     }
+                    onKeepEveryday={keepEveryday}
                   />
                 ) : tab === 'review' ? (
                   <GlossaryQuiz items={reviewItems} />

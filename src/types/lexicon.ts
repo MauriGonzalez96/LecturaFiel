@@ -88,7 +88,10 @@ export interface PipelineResult {
   stats: {
     wordsAnalyzed: number
     candidatesFound: number
-    /** Candidatas detectadas solo por rareza (fuera del léxico semilla). */
+    /**
+     * Palabras fuera del vocabulario cotidiano (por capítulo),
+     * excluyendo las ya cubiertas por el léxico semilla/arcaísmos.
+     */
     rarityDetected: number
     substituted: number
     glossaryOnly: number

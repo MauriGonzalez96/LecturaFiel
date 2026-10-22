@@ -29,10 +29,10 @@ export function InterventionNotice({
             ? `${substituted} palabra${substituted === 1 ? '' : 's'} cambiada${substituted === 1 ? '' : 's'} en «Se lee».`
             : 'Ninguna palabra tenía sinónimo curado en este capítulo.'}{' '}
           {rarity > 0
-            ? `${rarity} detectada${rarity === 1 ? '' : 's'} por rareza`
-            : 'Sin rareza automática'}
+            ? `${rarity} fuera del uso cotidiano`
+            : 'Nada fuera del uso cotidiano'}
           {glossaryOnly > 0
-            ? ` · ${glossaryOnly} solo en glosario (sin cambio en el texto).`
+            ? ` · ${glossaryOnly} solo en glosario (aún sin sinónimo).`
             : '.'}
         </p>
         <p className="intervention-notice-hint">{opt?.hint}</p>
