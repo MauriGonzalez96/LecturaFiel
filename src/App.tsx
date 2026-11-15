@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SAMPLE_CHAPTER } from './data/sampleChapter'
-import { runPipeline } from './engine/pipeline'
 import { decisionCache } from './engine/decisionCache'
+import { usePipelineResult } from './hooks/usePipelineResult'
 import { HighlightedText } from './components/HighlightedText'
 import { GlossaryPanel } from './components/GlossaryPanel'
 import { GlossaryQuiz } from './components/GlossaryQuiz'
@@ -69,19 +69,13 @@ export default function App() {
     }
   }, [library.ready, library.activeBookId, library.activeSlot])
 
-  const result = useMemo(() => {
-    void cacheTick
-    if (!text.trim() && !showDemo) {
-      return runPipeline('', {
-        chapter: 1,
-        intervention: intervention.options,
-      })
-    }
-    return runPipeline(text, {
-      chapter,
-      intervention: intervention.options,
-    })
-  }, [text, chapter, cacheTick, showDemo, intervention.options, userEveryday.words])
+  const pipelineBust = `${cacheTick}:${userEveryday.words.join(',')}:${showDemo ? 'd' : 'b'}`
+  const { result, pending: pipelinePending } = usePipelineResult(
+    text,
+    chapter,
+    intervention.options,
+    pipelineBust,
+  )
 
   function keepEveryday(word: string) {
     userEveryday.add(word)
@@ -519,6 +513,7 @@ export default function App() {
         <p className="foot-version" title="Versión de esta build">
           Lectura Fiel {APP_VERSION_LABEL}
           {library.saving ? ' · guardando…' : ''}
+          {pipelinePending ? ' · adaptando…' : ''}
         </p>
       </footer>
     </div>

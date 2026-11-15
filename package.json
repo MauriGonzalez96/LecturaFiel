@@ -1,7 +1,7 @@
 {
   "name": "lectura-fiel",
   "private": true,
-  "version": "0.3.7",
+  "version": "0.3.8",
   "type": "module",
   "description": "Audiolibro fiel al original: simplificación léxica selectiva y glosario",
   "scripts": {
@@ -9,15 +9,21 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "desktop:legacy": "desktop\\run_dev.bat"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.9.0",
     "jszip": "^3.10.2",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",

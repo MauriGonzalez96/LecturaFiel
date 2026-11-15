@@ -1,0 +1,64 @@
+# Build Tauri (Windows) en tags v*
+# Convive con el release legacy PyInstaller mientras se completa la migración.
+
+name: Release Tauri
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-tauri:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Tests JS
+        run: npm test
+
+      - name: Sync version
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
+            VER="$(node -p "require('./package.json').version")"
+          fi
+          node -e "const fs=require('fs'); const v=process.env.VER; const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.version=v; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n');"
+          node -e "const fs=require('fs'); const v=process.env.VER; const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8')); c.version=v; fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(c,null,2)+'\n');"
+          sed -i "s/^version = \".*\"/version = \"$VER\"/" src-tauri/Cargo.toml
+        env:
+          VER: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.event.inputs.version) }}
+          releaseName: 'Lectura Fiel ${{ github.ref_name }} (Tauri)'
+          releaseDraft: false
+          prerelease: false
+          args: --bundles nsis

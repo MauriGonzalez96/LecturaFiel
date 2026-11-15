@@ -13,9 +13,23 @@ npm run dev
 
 Abrí la URL de Vite (por defecto `http://localhost:5173`).
 
-## Ejecutable de escritorio (como MixCS)
+## Escritorio
 
-Mismo patrón: **pywebview (WebView2)** + servidor local + **PyInstaller**.
+### Nuevo (Tauri / Rust) — en migración
+
+```bash
+npm run tauri:dev    # desarrollo
+npm run tauri:build  # instalador NSIS
+```
+
+Requisitos: **Rust**, **WebView2**, Visual Studio Build Tools (C++).  
+Detalle: [`docs/TAURI_MIGRATION.md`](docs/TAURI_MIGRATION.md).
+
+El pipeline léxico corre en un **Web Worker** (UI más fluida). Hay un crate Rust (`crates/lectura-pipeline`) listo para WASM.
+
+### Legacy (pywebview + PyInstaller)
+
+Mismo patrón histórico: **pywebview (WebView2)** + servidor local + **PyInstaller**.
 
 - Botón **Cerrar** en la UI (solo visible en el `.exe`)
 - La **X** del sistema pide la misma confirmación

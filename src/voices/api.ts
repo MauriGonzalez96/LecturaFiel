@@ -9,6 +9,17 @@ export const DEFAULT_SAMPLE =
   'En un lugar de la Mancha, de cuyo nombre no quiero acordarme, no ha mucho tiempo que vivía un hidalgo.'
 
 export async function ttsApiAvailable(): Promise<boolean> {
+  // Tauri: por ahora sin Piper/neural embebido (SAPI del navegador sigue)
+  try {
+    const { getDesktopKind } = await import('../desktop/bridge')
+    if (getDesktopKind() === 'tauri') {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const data = await invoke<{ tts?: boolean }>('health')
+      return Boolean(data.tts)
+    }
+  } catch {
+    /* fall through */
+  }
   try {
     const r = await fetch('/api/health', { cache: 'no-store' })
     if (!r.ok) return false

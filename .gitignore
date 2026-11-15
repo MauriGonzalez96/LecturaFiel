@@ -6,6 +6,13 @@ dist
 !.vscode/extensions.json
 tsconfig.tsbuildinfo
 
+# Rust / Tauri
+/target/
+src-tauri/target/
+crates/*/target/
+src/wasm/pipeline/*
+!src/wasm/pipeline/.gitkeep
+
 # Desktop / PyInstaller
 desktop/static_front/
 desktop/build/

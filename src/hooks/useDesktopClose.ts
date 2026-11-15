@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
+import { closeDesktopApp, isDesktopShell } from '../desktop/bridge'
 
 /**
- * Bridge con pywebview (mismo patrón que MixCS):
- * - Botón in-app → confirmación → api.close_app()
- * - X del SO → Python llama __lecturaFielRequestClose → mismo diálogo
+ * Cierre de escritorio (Tauri o pywebview):
+ * - Botón in-app → confirmación → closeDesktopApp()
+ * - X del SO → __lecturaFielRequestClose → mismo diálogo
  */
 export function useDesktopClose() {
-  const isDesktop =
-    typeof window !== 'undefined' && Boolean(window.pywebview)
+  const isDesktop = isDesktopShell()
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -25,11 +25,7 @@ export function useDesktopClose() {
   const confirmClose = useCallback(() => {
     setClosing(true)
     setConfirmOpen(false)
-    try {
-      window.pywebview?.api?.close_app()
-    } catch {
-      setClosing(false)
-    }
+    void closeDesktopApp().catch(() => setClosing(false))
   }, [])
 
   useEffect(() => {
