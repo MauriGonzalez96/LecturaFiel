@@ -1,6 +1,6 @@
 [package]
 name = "lectura-fiel"
-version = "0.3.8"
+version = "0.3.9"
 description = "Lectura Fiel — audiolibro con simplificación léxica selectiva"
 authors = ["Lectura Fiel"]
 edition = "2021"
@@ -13,8 +13,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "5"
+msedge-tts = { version = "0.4", default-features = true }
+ureq = { version = "2", features = ["tls"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }

@@ -8,3 +8,7 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+# wasm-bindgen necesita la sección target_features
+[profile.release.package.lectura-pipeline]
+strip = false

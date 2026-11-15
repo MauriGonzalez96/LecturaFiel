@@ -4,33 +4,32 @@
 
 | Fase | Estado |
 |------|--------|
-| 1. Shell Tauri 2 | En curso (`src-tauri/`) |
-| 2. Pipeline en Web Worker | Hecho (`runPipelineAsync` + `usePipelineResult`) |
-| 3. Crate Rust/WASM | Stub (`crates/lectura-pipeline`) |
-| 4. TTS Piper vía Tauri | Pendiente (SAPI WebView sigue; health.tts=false) |
-| Legacy pywebview | Sigue disponible (`build.bat` / `desktop/`) |
+| 1. Shell Tauri 2 | Hecho |
+| 2. Pipeline en Web Worker | Hecho |
+| 3. Crate Rust/WASM | Hecho (léxico + arcaísmos + everyday + sinónimos) |
+| 4. TTS Piper/Neural vía Tauri | Hecho |
+| Legacy pywebview | Disponible (`npm run desktop:legacy` / `build.bat`) |
 
 ## Desarrollo
 
 ```bash
-# UI sola
-npm run dev
-
-# App escritorio Tauri (requiere Rust + WebView2)
-npm run tauri:dev
-
-# Legacy Python
+npm run dev          # UI sola
+npm run tauri:dev    # App escritorio (Rust + WebView2)
 npm run desktop:legacy
 ```
 
-## Compilar WASM del motor
+## Datos + WASM del motor
 
 ```bash
-cargo install wasm-pack
-wasm-pack build crates/lectura-pipeline --target web --out-dir ../../src/wasm/pipeline
+npm run data:export      # TS → crates/lectura-pipeline/data/*.json
+npm run wasm:pipeline    # wasm-pack → src/wasm/pipeline/ (gitignored)
 ```
 
-## Notas TTS
+El **Worker TypeScript** es la ruta de lectura en producción (glosario/UI).  
+El crate Rust/WASM replica el núcleo léxico para tests y uso futuro.
 
-En Tauri, `health.tts` está en `false` hasta portar Piper/neural.
-La lectura con voces **Windows (SpeechSynthesis)** sigue funcionando en WebView2.
+## TTS
+
+- **Neural**: `msedge-tts` (Edge Read Aloud)
+- **Piper**: CLI oficial + modelos HuggingFace en `%LOCALAPPDATA%\LecturaFiel`
+- **Windows SpeechSynthesis**: fallback en WebView2

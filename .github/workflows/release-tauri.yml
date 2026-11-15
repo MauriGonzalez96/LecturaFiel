@@ -1,5 +1,4 @@
-# Build Tauri (Windows) en tags v*
-# Convive con el release legacy PyInstaller mientras se completa la migración.
+# Build Tauri (Windows) en tags v* — convive con el release PyInstaller.
 
 name: Release Tauri
 
@@ -27,11 +26,16 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
+          workspaces: '. -> target'
 
       - name: npm ci
         run: npm ci
@@ -39,13 +43,21 @@ jobs:
       - name: Tests JS
         run: npm test
 
+      - name: Tests pipeline Rust
+        run: cargo test -p lectura-pipeline
+
+      - name: Build WASM smoke
+        run: npm run wasm:pipeline
+
       - name: Sync version
         shell: bash
         run: |
-          VER="${GITHUB_REF_NAME#v}"
-          if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VER="${GITHUB_REF_NAME#v}"
+          else
             VER="$(node -p "require('./package.json').version")"
           fi
+          echo "VER=$VER" >> "$GITHUB_ENV"
           node -e "const fs=require('fs'); const v=process.env.VER; const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.version=v; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n');"
           node -e "const fs=require('fs'); const v=process.env.VER; const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8')); c.version=v; fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(c,null,2)+'\n');"
           sed -i "s/^version = \".*\"/version = \"$VER\"/" src-tauri/Cargo.toml
@@ -57,8 +69,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.event.inputs.version) }}
-          releaseName: 'Lectura Fiel ${{ github.ref_name }} (Tauri)'
+          tagName: v${{ env.VER }}
+          releaseName: Lectura Fiel v${{ env.VER }} (Tauri)
           releaseDraft: false
           prerelease: false
           args: --bundles nsis

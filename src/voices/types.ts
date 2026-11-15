@@ -8,6 +8,7 @@ export interface VoicePrefs {
   firstRunDone?: boolean
   defaultApplied?: boolean
   piperFailed?: boolean
+  downloadPending?: boolean
 }
 
 export interface NeuralVoice {

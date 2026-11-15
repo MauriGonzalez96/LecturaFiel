@@ -31,8 +31,8 @@ fn health() -> serde_json::Value {
         "ok": true,
         "version": env!("CARGO_PKG_VERSION"),
         "shell": "tauri",
-        "tts": false,
-        "piper": false
+        "tts": true,
+        "piper": true
     })
 }
 
@@ -45,15 +45,23 @@ pub fn run() {
             app_version,
             data_dir,
             health,
-            tts::tts_status
+            tts::tts_status,
+            tts::tts_list_neural,
+            tts::tts_list_piper,
+            tts::tts_get_prefs,
+            tts::tts_save_prefs,
+            tts::tts_download_piper,
+            tts::tts_speak,
+            tts::tts_preview
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Pedir confirmación al front (mismo patrón que pywebview)
                 api.prevent_close();
-                let _ = window.eval(
-                    "window.__lecturaFielRequestClose && window.__lecturaFielRequestClose()",
-                );
+                if let Some(webview) = window.app_handle().get_webview_window(window.label()) {
+                    let _ = webview.eval(
+                        "window.__lecturaFielRequestClose && window.__lecturaFielRequestClose()",
+                    );
+                }
             }
         })
         .run(tauri::generate_context!())

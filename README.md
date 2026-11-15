@@ -15,7 +15,7 @@ Abrí la URL de Vite (por defecto `http://localhost:5173`).
 
 ## Escritorio
 
-### Nuevo (Tauri / Rust) — en migración
+### Tauri / Rust (recomendado)
 
 ```bash
 npm run tauri:dev    # desarrollo
@@ -25,46 +25,38 @@ npm run tauri:build  # instalador NSIS
 Requisitos: **Rust**, **WebView2**, Visual Studio Build Tools (C++).  
 Detalle: [`docs/TAURI_MIGRATION.md`](docs/TAURI_MIGRATION.md).
 
-El pipeline léxico corre en un **Web Worker** (UI más fluida). Hay un crate Rust (`crates/lectura-pipeline`) listo para WASM.
+El pipeline léxico corre en un **Web Worker**. Hay un crate Rust/WASM (`crates/lectura-pipeline`) con el mismo núcleo (léxico, arcaísmos, everyday, sinónimos). TTS: Piper, Neural (Edge) y voces Windows.
 
 ### Legacy (pywebview + PyInstaller)
-
-Mismo patrón histórico: **pywebview (WebView2)** + servidor local + **PyInstaller**.
-
-- Botón **Cerrar** en la UI (solo visible en el `.exe`)
-- La **X** del sistema pide la misma confirmación
-- Al salir: se detiene el servidor y se llama `os._exit(0)` para no dejar procesos vivos
 
 ```bat
 build.bat
 ```
 
-Cada build va a su carpeta: `release\vX.Y.Z\` (la versión sale de `package.json`). Adentro están `LecturaFiel.exe`, `LecturaFiel-vX.Y.Z.exe` y `VERSION.txt`. Las versiones anteriores no se pisan. `release\LATEST.txt` indica cuál fue la última build. La ventana y el pie de la app también muestran `vX.Y.Z`.
+O sin empaquetar: `npm run desktop:legacy` / `desktop\run_dev.bat`.  
+Requisitos: Python 3, WebView2, `pip install -r desktop\requirements.txt`.
 
-Para probar el launcher sin empaquetar:
-
-```bat
-desktop\run_dev.bat
-```
-
-Requisitos: Python 3, WebView2 Runtime (Windows 10/11 lo trae), `pip install -r desktop\requirements.txt`.
+Cada build legacy va a `release\vX.Y.Z\`.
 
 ## Versión y actualizaciones
 
-La versión vive en `package.json` (hoy `0.3.1`). Al subir features, aumentala antes de `build.bat` / del tag. El resultado local queda en `release\v0.3.1\`.
+La versión vive en `package.json` (hoy `0.3.9`).
 
 ### Publicar una versión (automático)
 
-1. Subí la versión en `package.json` (ej. `0.3.1`).
+1. Subí la versión en `package.json` (ej. `0.3.9`).
 2. Commit y push a `main`.
 3. Creá y pusheá el tag:
 
 ```bash
-git tag v0.3.1
-git push origin v0.3.1
+git tag v0.3.9
+git push origin v0.3.9
 ```
 
-4. GitHub Actions (workflow **Release**) buildea el `.exe` en Windows y lo publica en [Releases](https://github.com/MauriGonzalez96/LecturaFiel/releases).
+4. GitHub Actions publica:
+   - **Release** → `.exe` PyInstaller (legacy)
+   - **Release Tauri** → instalador NSIS  
+   En [Releases](https://github.com/MauriGonzalez96/LecturaFiel/releases).
 
 ### En la app
 
@@ -103,15 +95,12 @@ Los datos (voces Piper, preferencias) se guardan en `%LOCALAPPDATA%\LecturaFiel`
 ## Estructura
 
 ```
-src/
-  ingest/               PDF / EPUB / TXT → capítulos
-  data/lexicon.ts       Léxico semilla + índice
-  data/sampleChapter.ts Capítulo de demostración
-  engine/               Detector, evaluador, sustitutor, pipeline
-  hooks/useSpeech.ts    TTS del navegador
-  components/           Lector, subida, audio, glosario, repaso
-  App.tsx               Orquestación
-SPEC.md                 Requisitos del producto
+src/                   UI React + pipeline TS (Worker)
+src-tauri/             App Tauri + TTS nativo
+crates/lectura-pipeline/  Motor léxico Rust/WASM
+desktop/               Legacy pywebview + PyInstaller
+docs/TAURI_MIGRATION.md
+SPEC.md
 ```
 
 ## Formatos
