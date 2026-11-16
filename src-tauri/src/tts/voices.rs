@@ -2,8 +2,6 @@ use serde::Serialize;
 
 pub const SAMPLE_TEXT: &str = "En un lugar de la Mancha, de cuyo nombre no quiero acordarme, no ha mucho tiempo que vivía un hidalgo.";
 
-pub const DEFAULT_NEURAL_VOICE: &str = "es-AR-ElenaNeural";
-
 pub const PREFERRED_NEURAL: &[&str] = &[
     "es-AR-ElenaNeural",
     "es-AR-TomasNeural",
@@ -24,27 +22,27 @@ pub struct NeuralVoice {
     pub source: &'static str,
 }
 
+fn preferred_fallback() -> Vec<NeuralVoice> {
+    PREFERRED_NEURAL
+        .iter()
+        .map(|id| {
+            let locale = id.split('-').take(2).collect::<Vec<_>>().join("-");
+            NeuralVoice {
+                id: (*id).to_string(),
+                name: (*id).to_string(),
+                locale,
+                gender: String::new(),
+                source: "neural",
+            }
+        })
+        .collect()
+}
+
 /// Lista preferida (offline-friendly). Si hay red, se enriquece desde MS Edge.
 pub fn list_neural_voices() -> Vec<NeuralVoice> {
-    match try_list_edge_voices() {
-        Ok(v) if !v.is_empty() => v,
-        _ => PREFERRED_NEURAL
-            .iter()
-            .map(|id| {
-                let locale = id
-                    .split('-')
-                    .take(2)
-                    .collect::<Vec<_>>()
-                    .join("-");
-                NeuralVoice {
-                    id: (*id).to_string(),
-                    name: (*id).to_string(),
-                    locale,
-                    gender: String::new(),
-                    source: "neural",
-                }
-            })
-            .collect(),
+    match std::panic::catch_unwind(try_list_edge_voices) {
+        Ok(Ok(v)) if !v.is_empty() => v,
+        _ => preferred_fallback(),
     }
 }
 

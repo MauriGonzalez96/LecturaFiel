@@ -3,7 +3,8 @@ resolver = "2"
 members = ["src-tauri", "crates/lectura-pipeline"]
 
 [profile.release]
-panic = "abort"
+# unwind: un panic en un comando TTS no debe matar toda la app
+panic = "unwind"
 codegen-units = 1
 lto = true
 opt-level = "s"

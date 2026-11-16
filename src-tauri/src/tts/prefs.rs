@@ -2,8 +2,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::paths;
-use super::piper::{download_piper_voice, DEFAULT_PIPER_VOICE};
-use super::voices::DEFAULT_NEURAL_VOICE;
+use super::piper::{
+    download_piper_voice, ensure_piper_binary, is_installed, piper_binary_ready,
+    DEFAULT_PIPER_VOICE,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,37 +77,61 @@ pub fn save_prefs(partial: Value) -> Result<VoicePrefs, String> {
     Ok(prefs)
 }
 
+/// Primera apertura: voces Windows (estables). Piper se prepara en background.
 pub fn ensure_default_prefs() -> Result<VoicePrefs, String> {
     let prefs = load_prefs()?;
-    if prefs.first_run_done && prefs.source.is_some() && prefs.voice_id.is_some() {
+    if prefs.first_run_done && prefs.source.is_some() {
+        // Si quedó piper sin modelo, volver a Windows para no crashear al leer
+        if prefs.source.as_deref() == Some("piper") {
+            let vid = prefs
+                .voice_id
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PIPER_VOICE.to_string());
+            if !is_installed(&vid) || !piper_binary_ready() {
+                return save_prefs(json!({
+                    "source": "windows",
+                    "voiceId": null,
+                    "downloadPending": true,
+                    "piperFailed": false,
+                }));
+            }
+        }
         return Ok(prefs);
     }
 
     let prefs = save_prefs(json!({
-        "source": "piper",
-        "voiceId": DEFAULT_PIPER_VOICE,
+        "source": "windows",
+        "voiceId": null,
         "firstRunDone": true,
         "defaultApplied": true,
         "downloadPending": true,
         "piperFailed": false,
     }))?;
 
-    std::thread::spawn(|| {
-        match download_piper_voice(DEFAULT_PIPER_VOICE, false) {
-            Ok(_) => {
-                let _ = save_prefs(json!({ "downloadPending": false }));
+    std::thread::Builder::new()
+        .name("piper-prep".into())
+        .spawn(|| {
+            let ok = (|| -> Result<(), String> {
+                ensure_piper_binary()?;
+                download_piper_voice(DEFAULT_PIPER_VOICE, false)?;
+                Ok(())
+            })();
+            match ok {
+                Ok(()) => {
+                    let _ = save_prefs(json!({
+                        "downloadPending": false,
+                        // No forzar piper: el usuario elige en Voces; deja Windows
+                    }));
+                }
+                Err(_) => {
+                    let _ = save_prefs(json!({
+                        "downloadPending": false,
+                        "piperFailed": true,
+                    }));
+                }
             }
-            Err(_) => {
-                let _ = save_prefs(json!({
-                    "source": "neural",
-                    "voiceId": DEFAULT_NEURAL_VOICE,
-                    "firstRunDone": true,
-                    "piperFailed": true,
-                    "downloadPending": false,
-                }));
-            }
-        }
-    });
+        })
+        .ok();
 
     Ok(prefs)
 }

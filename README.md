@@ -40,17 +40,17 @@ Cada build legacy va a `release\vX.Y.Z\`.
 
 ## Versión y actualizaciones
 
-La versión vive en `package.json` (hoy `0.3.9`).
+La versión vive en `package.json` (hoy `0.3.10`).
 
 ### Publicar una versión (automático)
 
-1. Subí la versión en `package.json` (ej. `0.3.9`).
+1. Subí la versión en `package.json` (ej. `0.3.10`).
 2. Commit y push a `main`.
 3. Creá y pusheá el tag:
 
 ```bash
-git tag v0.3.9
-git push origin v0.3.9
+git tag v0.3.10
+git push origin v0.3.10
 ```
 
 4. GitHub Actions publica:

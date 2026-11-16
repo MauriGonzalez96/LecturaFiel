@@ -149,36 +149,39 @@ pub fn synthesize_piper(
     Ok(dest)
 }
 
-fn ensure_piper_binary() -> Result<PathBuf, String> {
-    let bin_dir = paths::piper_bin_dir()?;
-    let exe = bin_dir.join("piper").join("piper.exe");
-    if exe.is_file() {
+/// Solo comprueba disco (sin descargar).
+pub fn piper_binary_ready() -> bool {
+    find_piper_exe().is_some()
+}
+
+fn find_piper_exe() -> Option<PathBuf> {
+    let bin_dir = paths::piper_bin_dir().ok()?;
+    let candidates = [
+        bin_dir.join("piper").join("piper.exe"),
+        bin_dir.join("piper.exe"),
+    ];
+    for c in candidates {
+        if c.is_file() {
+            return Some(c);
+        }
+    }
+    walkdir_exe(&bin_dir)
+        .into_iter()
+        .find(|e| e.file_name().and_then(|n| n.to_str()) == Some("piper.exe"))
+}
+
+pub fn ensure_piper_binary() -> Result<PathBuf, String> {
+    if let Some(exe) = find_piper_exe() {
         return Ok(exe);
     }
-    // Algunos zips ponen piper.exe en la raíz
-    let alt = bin_dir.join("piper.exe");
-    if alt.is_file() {
-        return Ok(alt);
-    }
 
+    let bin_dir = paths::piper_bin_dir()?;
     let zip_path = bin_dir.join("piper_windows_amd64.zip");
     download_file(PIPER_ZIP_URL, &zip_path)?;
     extract_zip(&zip_path, &bin_dir)?;
     let _ = std::fs::remove_file(&zip_path);
 
-    if exe.is_file() {
-        return Ok(exe);
-    }
-    if alt.is_file() {
-        return Ok(alt);
-    }
-    // Buscar piper.exe bajo bin_dir
-    for entry in walkdir_exe(&bin_dir) {
-        if entry.file_name().and_then(|n| n.to_str()) == Some("piper.exe") {
-            return Ok(entry);
-        }
-    }
-    Err("No se encontró piper.exe tras la descarga".into())
+    find_piper_exe().ok_or_else(|| "No se encontró piper.exe tras la descarga".into())
 }
 
 fn walkdir_exe(root: &Path) -> Vec<PathBuf> {

@@ -256,10 +256,14 @@ export function useSpeech() {
       const prefs = readPrefs()
       const rate = clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE)
       const apiOk = await ttsApiAvailable()
+      // Piper en descarga / incompleto → Windows (evita tumbar el .exe Tauri)
+      const piperNotReady =
+        prefs.source === 'piper' && Boolean(prefs.downloadPending)
       const useRemote =
         (prefs.source === 'neural' || prefs.source === 'piper') &&
         Boolean(prefs.voiceId) &&
-        apiOk
+        apiOk &&
+        !piperNotReady
 
       const uri =
         prefs.source === 'windows' && prefs.voiceId

@@ -7,6 +7,7 @@ mod prefs;
 mod voices;
 
 use serde::Serialize;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 pub use neural::synthesize_neural;
 pub use piper::{download_piper_voice, list_piper_voices, synthesize_piper};
@@ -20,48 +21,81 @@ pub struct TtsStatus {
     pub note: String,
 }
 
+fn safe_result<T, F>(f: F, label: &str) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String>,
+{
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(r) => r,
+        Err(_) => Err(format!(
+            "Error interno en {label}. Probá voces Windows o reiniciá la app."
+        )),
+    }
+}
+
 #[tauri::command]
 pub fn tts_status() -> TtsStatus {
     TtsStatus {
         available: true,
         backends: vec!["windows-speech-synthesis (webview)", "neural", "piper"],
-        note: "Neural vía MS Edge; Piper descarga binario + modelo bajo demanda.".into(),
+        note: "Por defecto Windows; Piper/Neural bajo demanda.".into(),
     }
 }
 
 #[tauri::command]
 pub fn tts_list_neural() -> Result<serde_json::Value, String> {
-    Ok(serde_json::json!({
-        "voices": list_neural_voices(),
-        "sampleText": SAMPLE_TEXT,
-    }))
+    safe_result(
+        || {
+            Ok(serde_json::json!({
+                "voices": list_neural_voices(),
+                "sampleText": SAMPLE_TEXT,
+            }))
+        },
+        "listar voces neurales",
+    )
 }
 
 #[tauri::command]
 pub fn tts_list_piper() -> Result<serde_json::Value, String> {
-    Ok(serde_json::json!({
-        "voices": list_piper_voices(),
-        "sampleText": SAMPLE_TEXT,
-    }))
+    safe_result(
+        || {
+            Ok(serde_json::json!({
+                "voices": list_piper_voices(),
+                "sampleText": SAMPLE_TEXT,
+            }))
+        },
+        "listar voces Piper",
+    )
 }
 
 #[tauri::command]
 pub fn tts_get_prefs() -> Result<serde_json::Value, String> {
-    let prefs = ensure_default_prefs()?;
-    Ok(serde_json::json!({
-        "prefs": prefs,
-        "sampleText": SAMPLE_TEXT,
-    }))
+    safe_result(
+        || {
+            let prefs = ensure_default_prefs()?;
+            Ok(serde_json::json!({
+                "prefs": prefs,
+                "sampleText": SAMPLE_TEXT,
+            }))
+        },
+        "preferencias de voz",
+    )
 }
 
 #[tauri::command]
 pub fn tts_save_prefs(prefs: serde_json::Value) -> Result<VoicePrefs, String> {
-    save_prefs(prefs)
+    safe_result(|| save_prefs(prefs), "guardar preferencias")
 }
 
 #[tauri::command]
 pub fn tts_download_piper(voice_id: String) -> Result<serde_json::Value, String> {
-    download_piper_voice(&voice_id, false)
+    safe_result(
+        || {
+            let _ = piper::ensure_piper_binary()?;
+            download_piper_voice(&voice_id, false)
+        },
+        "descarga Piper",
+    )
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -75,15 +109,29 @@ pub struct SpeakRequest {
 
 #[tauri::command]
 pub fn tts_speak(req: SpeakRequest) -> Result<serde_json::Value, String> {
-    let path = match req.source.as_str() {
-        "piper" => synthesize_piper(&req.voice_id, &req.text, req.rate)?,
-        "neural" => synthesize_neural(&req.voice_id, &req.text, req.rate)?,
-        other => return Err(format!("Fuente TTS desconocida: {other}")),
-    };
-    cleanup_old_audio(12);
-    Ok(serde_json::json!({
-        "path": path.to_string_lossy(),
-    }))
+    safe_result(
+        || {
+            // No sintetizar Piper si aún no está listo (evita descargas gigantes al pulsar Leer)
+            if req.source == "piper"
+                && (!piper::is_installed(&req.voice_id) || !piper::piper_binary_ready())
+            {
+                return Err(
+                    "Piper aún no está listo. Usá voces Windows o descargá el modelo en Voces."
+                        .into(),
+                );
+            }
+            let path = match req.source.as_str() {
+                "piper" => synthesize_piper(&req.voice_id, &req.text, req.rate)?,
+                "neural" => synthesize_neural(&req.voice_id, &req.text, req.rate)?,
+                other => return Err(format!("Fuente TTS desconocida: {other}")),
+            };
+            cleanup_old_audio(12);
+            Ok(serde_json::json!({
+                "path": path.to_string_lossy(),
+            }))
+        },
+        "síntesis TTS",
+    )
 }
 
 #[tauri::command]
