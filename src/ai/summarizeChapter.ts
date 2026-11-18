@@ -1,4 +1,5 @@
-import { loadAiConfig, aiConfigured } from './config'
+import { chatCompletion } from './chatClient'
+import { loadAiConfig } from './config'
 import { textHash } from './hash'
 import {
   loadChapterSummary,
@@ -43,59 +44,6 @@ function chunkText(text: string): string[] {
   return parts.filter(Boolean)
 }
 
-async function chatCompletion(
-  messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
-  signal?: AbortSignal,
-): Promise<string> {
-  const config = loadAiConfig()
-  if (!aiConfigured(config)) {
-    throw new Error(
-      'Configurá la IA en Ajustes (URL, modelo y, si hace falta, API key).',
-    )
-  }
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (config.apiKey.trim()) {
-    headers.Authorization = `Bearer ${config.apiKey.trim()}`
-  }
-
-  const res = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0.3,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      messages,
-    }),
-    signal,
-  })
-
-  if (!res.ok) {
-    let detail = ''
-    try {
-      const err = (await res.json()) as { error?: { message?: string } }
-      detail = err.error?.message ?? ''
-    } catch {
-      detail = await res.text().catch(() => '')
-    }
-    throw new Error(
-      detail
-        ? `IA (${res.status}): ${detail}`
-        : `La API de IA respondió ${res.status}`,
-    )
-  }
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[]
-  }
-  const content = data.choices?.[0]?.message?.content?.trim()
-  if (!content) throw new Error('La IA no devolvió texto')
-  return content
-}
-
 async function summarizePiece(
   title: string,
   piece: string,
@@ -113,7 +61,7 @@ async function summarizePiece(
           `Redactá el resumen de la idea fundamental de este tramo.`,
       },
     ],
-    signal,
+    { temperature: 0.3, maxTokens: MAX_OUTPUT_TOKENS, signal },
   )
 }
 
@@ -177,7 +125,7 @@ export async function summarizeChapter(opts: {
             partials.map((p, i) => `--- Parte ${i + 1} ---\n${p}`).join('\n\n'),
         },
       ],
-      opts.signal,
+      { temperature: 0.3, maxTokens: MAX_OUTPUT_TOKENS, signal: opts.signal },
     )
   }
 

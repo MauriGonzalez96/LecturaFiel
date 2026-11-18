@@ -169,14 +169,16 @@ export function AiSettingsPanel({ onClose, onSaved }: Props) {
             type="text"
             value={form.model}
             onChange={(e) => update('model', e.target.value)}
-            placeholder="gemini-2.0-flash"
+            placeholder="gemini-3-flash-preview"
             autoComplete="off"
           />
         </label>
         {isGemini && (
           <p className="settings-hint">
-            Modelos útiles: <code>gemini-2.0-flash</code>,{' '}
-            <code>gemini-2.5-flash</code>, <code>gemini-1.5-flash</code>.
+            Recomendado: <code>gemini-3-flash-preview</code>. Alternativas:{' '}
+            <code>gemini-flash-latest</code>,{' '}
+            <code>gemini-3.1-flash-lite-preview</code>. Si un modelo satura o
+            fue retirado, la app prueba otro automáticamente.
           </p>
         )}
       </details>

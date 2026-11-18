@@ -12,7 +12,11 @@ import {
   INTERVENTION_OPTIONS,
   type InterventionMode,
 } from './settings/intervention'
-import { AudioPlayer } from './components/AudioPlayer'
+import {
+  AudioPlayer,
+  type NowPlayingInfo,
+} from './components/AudioPlayer'
+import { SummaryReadView } from './components/SummaryReadView'
 import { ChangeLog } from './components/ChangeLog'
 import { FileUpload } from './components/FileUpload'
 import { BookNav } from './components/BookNav'
@@ -67,6 +71,7 @@ export default function App() {
   const [summaryIndexTick, setSummaryIndexTick] = useState(0)
   const [heardTick, setHeardTick] = useState(0)
   const [listenOverride, setListenOverride] = useState<string | null>(null)
+  const [nowPlaying, setNowPlaying] = useState<NowPlayingInfo | null>(null)
   const [levelNotice, setLevelNotice] = useState(false)
   const [readerFlash, setReaderFlash] = useState(false)
   const prevModeRef = useRef(intervention.mode)
@@ -696,6 +701,7 @@ export default function App() {
                           onOpenSettings={() => setShowAiSettings(true)}
                           onListen={() => {
                             setListenOverride(null)
+                            setTab('ai')
                             setListenSummaryNonce((n) => n + 1)
                           }}
                           chapters={summaryChapterOptions}
@@ -719,6 +725,7 @@ export default function App() {
                           onListenProgress={() => {
                             if (!progressSummary.progressText.trim()) return
                             setListenOverride(progressSummary.progressText)
+                            setTab('ai')
                             setListenSummaryNonce((n) => n + 1)
                           }}
                           onSelectChapter={(index) => {
@@ -849,6 +856,10 @@ export default function App() {
                         setSummaryIndexTick((n) => n + 1)
                       })
                     }}
+                    onNowPlaying={(info) => {
+                      setNowPlaying(info)
+                      if (info?.source === 'summary') setTab('ai')
+                    }}
                   />
                 </>
               )}
@@ -872,22 +883,35 @@ export default function App() {
                 ) : tab === 'review' ? (
                   <GlossaryQuiz items={reviewItems} />
                 ) : tab === 'ai' ? (
-                  chapterSummary.summaryText ? (
-                    <div className="chapter-summary-read">
-                      {chapterSummary.summaryText.split(/\n+/).map((p, i) => (
-                        <p key={i}>{p}</p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted">
-                      Generá el resumen arriba para verlo y escucharlo con el
-                      botón «Resumen IA».
-                    </p>
-                  )
+                  <SummaryReadView
+                    text={listenOverride ?? chapterSummary.summaryText}
+                    chapterLabel={
+                      listenOverride
+                        ? progressSummary.progress?.title ||
+                          'Resumen hasta este capítulo'
+                        : currentChapterLabel
+                    }
+                    activeSentenceIndex={
+                      nowPlaying?.source === 'summary'
+                        ? nowPlaying.sentenceIndex
+                        : null
+                    }
+                    emptyHint={
+                      chapterSummary.status === 'loading'
+                        ? 'Generando resumen… el texto aparecerá acá y podrás escucharlo con «Resumen IA».'
+                        : 'Generá el resumen arriba para verlo y escucharlo con el botón «Resumen IA».'
+                    }
+                  />
                 ) : (
                   <HighlightedText
                     result={result}
-                    activeSentenceIndex={showDemo ? 0 : sentenceIndex}
+                    activeSentenceIndex={
+                      nowPlaying && nowPlaying.source !== 'summary'
+                        ? nowPlaying.sentenceIndex
+                        : showDemo
+                          ? 0
+                          : sentenceIndex
+                    }
                     onPlaceCursor={showDemo ? undefined : placeCursor}
                   />
                 )}

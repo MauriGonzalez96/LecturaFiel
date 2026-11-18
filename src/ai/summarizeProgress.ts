@@ -1,3 +1,4 @@
+import { chatCompletion } from './chatClient'
 import { aiConfigured, loadAiConfig } from './config'
 import { textHash } from './hash'
 import {
@@ -75,7 +76,7 @@ export async function summarizeProgressSoFar(opts: {
           `Redactá el resumen acumulado «hasta aquí».`,
       },
     ],
-    opts.signal,
+    { temperature: 0.3, maxTokens: MAX_OUTPUT_TOKENS, signal: opts.signal },
   )
 
   const record: ProgressSummary = {
@@ -90,51 +91,4 @@ export async function summarizeProgressSoFar(opts: {
   }
   await saveProgressSummary(record)
   return record
-}
-
-async function chatCompletion(
-  messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
-  signal?: AbortSignal,
-): Promise<string> {
-  const config = loadAiConfig()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (config.apiKey.trim()) {
-    headers.Authorization = `Bearer ${config.apiKey.trim()}`
-  }
-
-  const res = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0.3,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      messages,
-    }),
-    signal,
-  })
-
-  if (!res.ok) {
-    let detail = ''
-    try {
-      const err = (await res.json()) as { error?: { message?: string } }
-      detail = err.error?.message ?? ''
-    } catch {
-      detail = await res.text().catch(() => '')
-    }
-    throw new Error(
-      detail
-        ? `IA (${res.status}): ${detail}`
-        : `La API de IA respondió ${res.status}`,
-    )
-  }
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[]
-  }
-  const content = data.choices?.[0]?.message?.content?.trim()
-  if (!content) throw new Error('La IA no devolvió texto')
-  return content
 }

@@ -4,10 +4,17 @@ const memory = new Map<string, unknown>()
 
 vi.mock('./config', () => ({
   aiConfigured: () => true,
+  migrateAiModel: (m: string) => m,
+  saveAiConfig: (partial: Record<string, string>) => ({
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    apiKey: 'AIza-test-fake-key',
+    model: 'gemini-3-flash-preview',
+    ...partial,
+  }),
   loadAiConfig: () => ({
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     apiKey: 'AIza-test-fake-key',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-flash-preview',
   }),
 }))
 
@@ -68,7 +75,7 @@ describe('summarizeChapter (mock Gemini)', () => {
     })
 
     expect(result.summary).toMatch(/planificación|libertad|autoritarismo/i)
-    expect(result.model).toBe('gemini-2.0-flash')
+    expect(result.model).toBe('gemini-3-flash-preview')
     expect(result.textHash).toBe(textHash(sample))
     expect(fetch).toHaveBeenCalled()
     const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]

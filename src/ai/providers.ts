@@ -22,7 +22,7 @@ export const AI_PROVIDERS: AiProviderPreset[] = [
     hint: 'Usá Gemini con una API key de Google AI Studio (guía paso a paso en la pantalla).',
     config: {
       baseUrl: GEMINI_OPENAI_BASE,
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview',
     },
     needsKey: true,
     keyHelp: 'https://aistudio.google.com/apikey',

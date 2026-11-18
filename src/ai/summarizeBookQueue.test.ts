@@ -4,6 +4,13 @@ const memory = new Map<string, unknown>()
 
 vi.mock('./config', () => ({
   aiConfigured: () => true,
+  migrateAiModel: (m: string) => m,
+  saveAiConfig: (partial: Record<string, string>) => ({
+    baseUrl: 'https://example.test/v1',
+    apiKey: 'test-key',
+    model: 'test-model',
+    ...partial,
+  }),
   loadAiConfig: () => ({
     baseUrl: 'https://example.test/v1',
     apiKey: 'test-key',

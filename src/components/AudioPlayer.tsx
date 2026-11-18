@@ -40,10 +40,28 @@ interface Props {
    * El player espera `summaryStatus === 'loading' → ready`.
    */
   onGenerateSummaryForChain?: () => void
+  /** Avisa qué se está leyendo (para resaltar texto y cambiar de pestaña). */
+  onNowPlaying?: (info: NowPlayingInfo | null) => void
 }
 
-type Source = 'adapted' | 'original' | 'summary'
+export type AudioSource = 'adapted' | 'original' | 'summary'
+
+export type NowPlayingInfo = {
+  source: AudioSource
+  status: SpeechStatus
+  sentenceIndex: number
+  sentenceText: string
+  chapterLabel: string
+}
+
+type Source = AudioSource
 type PromptKind = 'next' | 'finished' | null
+
+const SOURCE_LABEL: Record<Source, string> = {
+  adapted: 'Adaptado',
+  original: 'Original',
+  summary: 'Resumen IA',
+}
 
 const PROMPT_KEY = 'lectura-fiel:ask-continue'
 const CHAIN_KEY = 'lectura-fiel:chain-summaries'
@@ -83,6 +101,7 @@ export function AudioPlayer({
   summaryStatus = 'idle',
   onSummaryHeard,
   onGenerateSummaryForChain,
+  onNowPlaying,
 }: Props) {
   const { status, speak, stop, pause, resume } = useSpeech()
   const { rate, setRate } = useSpeechRate()
@@ -90,11 +109,14 @@ export function AudioPlayer({
   const [chainSummaries, setChainSummaries] = useState(readChainSummaries)
   const [source, setSource] = useState<Source>('adapted')
   const [prompt, setPrompt] = useState<PromptKind>(null)
+  const [liveSentence, setLiveSentence] = useState(resumeSentenceIndex)
   const continueRef = useRef(false)
   const pendingSummaryChainRef = useRef(false)
   const prevChapterRef = useRef(chapterKey)
   const lastSentenceRef = useRef(resumeSentenceIndex)
   const titleId = useId()
+  const nowPlayingRef = useRef(onNowPlaying)
+  nowPlayingRef.current = onNowPlaying
 
   const askRef = useRef(askContinue)
   const chainRef = useRef(chainSummaries)
@@ -168,7 +190,11 @@ export function AudioPlayer({
 
   function reportSentence(index: number) {
     lastSentenceRef.current = index
-    progressRef.current?.(index)
+    setLiveSentence(index)
+    // No pisar el cursor del capítulo al escuchar el resumen IA.
+    if (sourceRef.current !== 'summary') {
+      progressRef.current?.(index)
+    }
   }
 
   function onPlaybackComplete() {
@@ -305,18 +331,57 @@ export function AudioPlayer({
     continueRef.current = false
   }
 
-  if (status === 'unsupported') {
-    return (
-      <div className="audio-bar muted">
-        Tu navegador no soporta lectura en voz alta.
-      </div>
-    )
-  }
+  const where =
+    currentLabel?.trim() ||
+    (hasNextChapter ? 'este capítulo' : 'el último capítulo')
+
+  const activeText =
+    source === 'summary'
+      ? summaryText
+      : source === 'original'
+        ? originalText
+        : adaptedText
+  const sentences = splitSentences(activeText)
+  const sentenceCount = sentences.length
+  const spokenIndex =
+    status === 'speaking' || status === 'paused' || status === 'loading'
+      ? liveSentence
+      : source !== 'summary'
+        ? resumeSentenceIndex
+        : 0
+  const spokenText =
+    sentences[Math.min(spokenIndex, Math.max(0, sentenceCount - 1))] ?? ''
+  const canResume =
+    source !== 'summary' &&
+    resumeSentenceIndex > 0 &&
+    resumeSentenceIndex < sentenceCount
+  const hasSummary = Boolean(summaryText.trim())
+  const chapterLabel = currentLabel?.trim() || 'Capítulo actual'
+
+  useEffect(() => {
+    if (status === 'unsupported') {
+      nowPlayingRef.current?.(null)
+      return
+    }
+    if (status === 'idle' && !prompt) {
+      nowPlayingRef.current?.(null)
+      return
+    }
+    if (status === 'idle') return
+    nowPlayingRef.current?.({
+      source,
+      status,
+      sentenceIndex: spokenIndex,
+      sentenceText: spokenText,
+      chapterLabel,
+    })
+  }, [status, source, spokenIndex, spokenText, chapterLabel, prompt])
 
   function play(next: Source, fromStart = false) {
     setSource(next)
     continueRef.current = false
     setPrompt(null)
+    setLiveSentence(fromStart ? 0 : Math.max(0, resumeIdxRef.current))
     const text =
       next === 'summary'
         ? summaryText
@@ -343,25 +408,59 @@ export function AudioPlayer({
     stop()
   }
 
-  const where =
-    currentLabel?.trim() ||
-    (hasNextChapter ? 'este capítulo' : 'el último capítulo')
-
-  const activeText =
-    source === 'summary'
-      ? summaryText
-      : source === 'original'
-        ? originalText
-        : adaptedText
-  const sentenceCount = splitSentences(activeText).length
-  const canResume =
-    source !== 'summary' &&
-    resumeSentenceIndex > 0 &&
-    resumeSentenceIndex < sentenceCount
-  const hasSummary = Boolean(summaryText.trim())
+  if (status === 'unsupported') {
+    return (
+      <div className="audio-bar muted">
+        Tu navegador no soporta lectura en voz alta.
+      </div>
+    )
+  }
 
   return (
     <>
+      <div className="audio-now" aria-live="polite">
+        <div className="audio-now-meta">
+          <strong>{SOURCE_LABEL[source]}</strong>
+          <span aria-hidden="true">·</span>
+          <span>{chapterLabel}</span>
+          {(status === 'speaking' ||
+            status === 'paused' ||
+            status === 'loading') &&
+            sentenceCount > 0 && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>
+                  oración {Math.min(spokenIndex + 1, sentenceCount)}/
+                  {sentenceCount}
+                </span>
+              </>
+            )}
+        </div>
+        {(status === 'speaking' ||
+          status === 'paused' ||
+          status === 'loading') && (
+          <p className="audio-now-line">
+            {status === 'loading'
+              ? 'Preparando voz…'
+              : spokenText
+                ? `«${spokenText.length > 160 ? `${spokenText.slice(0, 157)}…` : spokenText}»`
+                : 'Leyendo…'}
+          </p>
+        )}
+        {status === 'idle' && !hasSummary && source !== 'summary' && (
+          <p className="audio-now-hint muted">
+            Estás en el texto {SOURCE_LABEL[source].toLowerCase()}. Generá un
+            resumen IA del capítulo para verlo y escucharlo acá.
+          </p>
+        )}
+        {status === 'idle' && hasSummary && source !== 'summary' && (
+          <p className="audio-now-hint muted">
+            Resumen listo para «{chapterLabel}». Usá el botón «Resumen IA» o
+            abrí la pestaña Resumen IA.
+          </p>
+        )}
+      </div>
+
       <div className="audio-bar" role="group" aria-label="Reproducir audio">
         <div className="audio-controls">
           {status === 'paused' ? (
@@ -501,7 +600,9 @@ export function AudioPlayer({
 
         <StatusDot
           status={status}
-          sentenceIndex={resumeSentenceIndex}
+          sourceLabel={SOURCE_LABEL[source]}
+          chapterLabel={chapterLabel}
+          sentenceIndex={spokenIndex}
           sentenceCount={sentenceCount}
         />
       </div>
@@ -583,10 +684,14 @@ export function AudioPlayer({
 
 function StatusDot({
   status,
+  sourceLabel,
+  chapterLabel,
   sentenceIndex,
   sentenceCount,
 }: {
   status: SpeechStatus
+  sourceLabel: string
+  chapterLabel: string
   sentenceIndex: number
   sentenceCount: number
 }) {
@@ -594,20 +699,24 @@ function StatusDot({
     if (sentenceIndex > 0 && sentenceCount > 0) {
       return (
         <span className="audio-status status-idle" aria-live="polite">
-          Guardado · oración {sentenceIndex + 1}/{sentenceCount}
+          Guardado · {sourceLabel} · oración {sentenceIndex + 1}/{sentenceCount}
         </span>
       )
     }
-    return null
+    return (
+      <span className="audio-status status-idle muted" aria-live="polite">
+        {sourceLabel} · {chapterLabel}
+      </span>
+    )
   }
   const label =
     status === 'loading'
-      ? 'Preparando voz…'
+      ? `Preparando voz · ${sourceLabel} · ${chapterLabel}`
       : status === 'speaking'
         ? sentenceCount > 0
-          ? `Reproduciendo · oración ${Math.min(sentenceIndex + 1, sentenceCount)}/${sentenceCount}`
-          : 'Reproduciendo…'
-        : 'En pausa'
+          ? `${sourceLabel} · oración ${Math.min(sentenceIndex + 1, sentenceCount)}/${sentenceCount}`
+          : `Reproduciendo · ${sourceLabel}`
+        : `En pausa · ${sourceLabel}`
   return (
     <span className={`audio-status status-${status}`} aria-live="polite">
       {label}
