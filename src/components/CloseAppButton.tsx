@@ -1,6 +1,6 @@
 import { useDesktopClose } from '../hooks/useDesktopClose'
 
-/** Botón de apagado + diálogo de confirmación (solo en el .exe / pywebview). */
+/** Botón de apagado + diálogo de confirmación (solo en la app Tauri). */
 export function CloseAppButton() {
   const {
     isDesktop,

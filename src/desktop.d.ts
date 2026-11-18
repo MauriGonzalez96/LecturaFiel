@@ -2,11 +2,7 @@ export {}
 
 declare global {
   interface Window {
-    pywebview?: {
-      api?: {
-        close_app: () => void
-      }
-    }
+    __TAURI_INTERNALS__?: unknown
     __lecturaFielRequestClose?: () => void
   }
 }

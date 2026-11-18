@@ -1,4 +1,4 @@
-# Build Tauri (Windows) en tags v* — convive con el release PyInstaller.
+# Build e instalador Tauri (Windows) al pushear un tag v*.
 
 name: Release Tauri
 
@@ -70,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v${{ env.VER }}
-          releaseName: Lectura Fiel v${{ env.VER }} (Tauri)
+          releaseName: Lectura Fiel v${{ env.VER }}
           releaseDraft: false
           prerelease: false
           args: --bundles nsis

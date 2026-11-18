@@ -32,15 +32,17 @@ function pickExeAsset(assets: GhAsset[], version: string): GhAsset | null {
   const exes = assets.filter((a) => /\.exe$/i.test(a.name))
   if (exes.length === 0) return null
 
+  // Preferir instalador NSIS de Tauri.
+  const setup = exes.find((a) => /setup\.exe$/i.test(a.name))
+  if (setup) return setup
+
   const versioned = exes.find(
     (a) =>
       a.name.toLowerCase() === `lecturafiel-v${version}.exe`.toLowerCase() ||
-      a.name.toLowerCase().includes(`-v${version}.exe`.toLowerCase()),
+      a.name.toLowerCase().includes(`-v${version}.exe`.toLowerCase()) ||
+      a.name.toLowerCase().includes(`_${version}_`),
   )
   if (versioned) return versioned
-
-  const plain = exes.find((a) => a.name.toLowerCase() === 'lecturafiel.exe')
-  if (plain) return plain
 
   return exes[0] ?? null
 }

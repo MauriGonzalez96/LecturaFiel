@@ -1,7 +1,7 @@
 {
   "name": "lectura-fiel",
   "private": true,
-  "version": "4.0.0",
+  "version": "4.0.1",
   "type": "module",
   "description": "Audiolibro fiel al original: simplificación léxica selectiva y glosario",
   "scripts": {
@@ -14,8 +14,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "data:export": "node scripts/export-pipeline-data.mjs",
-    "wasm:pipeline": "npm run data:export && wasm-pack build crates/lectura-pipeline --target web --out-dir ../../src/wasm/pipeline",
-    "desktop:legacy": "desktop\\run_dev.bat"
+    "wasm:pipeline": "npm run data:export && wasm-pack build crates/lectura-pipeline --target web --out-dir ../../src/wasm/pipeline"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.0",

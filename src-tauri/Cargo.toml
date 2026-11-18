@@ -1,6 +1,6 @@
 [package]
 name = "lectura-fiel"
-version = "4.0.0"
+version = "4.0.1"
 description = "Lectura Fiel — audiolibro con simplificación léxica selectiva"
 authors = ["Lectura Fiel"]
 edition = "2021"

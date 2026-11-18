@@ -17,13 +17,6 @@ crates/*/target/
 src/wasm/pipeline/*
 !src/wasm/pipeline/.gitkeep
 
-# Desktop / PyInstaller
-desktop/static_front/
-desktop/build/
-desktop/dist/
-desktop/data/
-desktop/_test_piper/
-desktop/__pycache__/
 **/__pycache__/
 *.pyc
 release/

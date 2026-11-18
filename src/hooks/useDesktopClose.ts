@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { closeDesktopApp, isDesktopShell } from '../desktop/bridge'
 
 /**
- * Cierre de escritorio (Tauri o pywebview):
+ * Cierre de escritorio (Tauri):
  * - Botón in-app → confirmación → closeDesktopApp()
  * - X del SO → __lecturaFielRequestClose → mismo diálogo
  */
