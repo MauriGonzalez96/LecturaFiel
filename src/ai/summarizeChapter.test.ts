@@ -77,7 +77,7 @@ describe('summarizeChapter (mock Gemini)', () => {
     expect(result.summary).toMatch(/planificación|libertad|autoritarismo/i)
     expect(result.model).toBe('gemini-3-flash-preview')
     expect(result.textHash).toBe(
-      textHash(`esencia-conceptos-v3\n${sample}`),
+      textHash(`explicacion-neutra-v4\n${sample}`),
     )
     expect(fetch).toHaveBeenCalled()
     const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]

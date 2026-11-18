@@ -64,6 +64,9 @@ export default function App() {
   const [showAiSplit, setShowAiSplit] = useState(false)
   const [demoText, setDemoText] = useState(SAMPLE_CHAPTER.text)
   const [tab, setTab] = useState<Tab>('read')
+  const tabRef = useRef<Tab>('read')
+  tabRef.current = tab
+  const voicesReturnTabRef = useRef<Tab>('read')
   const [cacheTick, setCacheTick] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [seekNonce, setSeekNonce] = useState(0)
@@ -450,7 +453,11 @@ export default function App() {
 
         <div className="chrome-actions">
           <SettingsMenu
-            onOpenVoices={() => setTab('voices')}
+            onOpenVoices={() => {
+              voicesReturnTabRef.current =
+                tabRef.current === 'voices' ? 'read' : tabRef.current
+              setTab('voices')
+            }}
             onClearCache={clearCache}
             onDemo={DEMO_ENABLED ? goDemo : undefined}
             demoEnabled={DEMO_ENABLED}
@@ -587,15 +594,17 @@ export default function App() {
               <button
                 type="button"
                 className="btn ghost"
-                onClick={() => setTab('read')}
+                onClick={() => setTab(voicesReturnTabRef.current)}
               >
-                Volver a lectura
+                Volver
               </button>
             )}
           </div>
 
           {tab === 'voices' ? (
-            <VoiceStudio onClose={() => setTab('read')} />
+            <VoiceStudio
+              onClose={() => setTab(voicesReturnTabRef.current)}
+            />
           ) : tab === 'ai' && emptyProduction ? (
             <AiSettingsPanel
               onClose={() => setTab('read')}
@@ -838,7 +847,11 @@ export default function App() {
                     hasNextChapter={hasNextChapter}
                     nextChapterLabel={nextChapterLabel}
                     onAdvanceChapter={advanceChapter}
-                    onOpenVoices={() => setTab('voices')}
+                    onOpenVoices={() => {
+                      voicesReturnTabRef.current =
+                        tabRef.current === 'voices' ? 'read' : tabRef.current
+                      setTab('voices')
+                    }}
                     resumeSentenceIndex={showDemo ? 0 : sentenceIndex}
                     onSentenceProgress={
                       showDemo ? undefined : saveSentenceProgress
@@ -865,7 +878,13 @@ export default function App() {
                     }}
                     onNowPlaying={(info) => {
                       setNowPlaying(info)
-                      if (info?.source === 'summary') setTab('ai')
+                      // No expulsar de Voces mientras se elige timbre.
+                      if (
+                        info?.source === 'summary' &&
+                        tabRef.current !== 'voices'
+                      ) {
+                        setTab('ai')
+                      }
                     }}
                   />
                 </>

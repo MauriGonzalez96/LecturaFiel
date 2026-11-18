@@ -457,9 +457,8 @@ export function ChapterSummaryPanel({
               : ' del capítulo (IA)'}
           </h3>
           <p className="chapter-summary-hint">
-            Como alguien que leyó el capítulo con ganas: te cuenta la esencia,
-            introduce los conceptos del autor (también los que Lectura Fiel
-            intercambió) y explica en qué contexto los usa.
+            Explicación detallada del capítulo: esencia del argumento, conceptos
+            del autor (también los intercambiados) y el contexto en que los usa.
           </p>
         </div>
         <div className="chapter-summary-actions">
@@ -541,11 +540,13 @@ export function ChapterSummaryPanel({
           <div className="chapter-summary-bar">
             <div>
               <h3 className="chapter-summary-title">
-                Resumen hasta este capítulo
+                Arco del libro hasta acá (opcional)
               </h3>
               <p className="chapter-summary-hint">
-                Arco del libro usando los {progressAvailableCount} resumen
-                {progressAvailableCount === 1 ? '' : 'es'} ya listos hasta acá.
+                No reemplaza la explicación del capítulo: es un panorama de cómo
+                avanzó el libro con los {progressAvailableCount} resumen
+                {progressAvailableCount === 1 ? '' : 'es'} ya hechos hasta este
+                punto.
               </p>
             </div>
             <div className="chapter-summary-actions">

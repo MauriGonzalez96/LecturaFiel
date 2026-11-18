@@ -6,6 +6,7 @@ import {
   type InterventionMode,
 } from '../settings/intervention'
 import { APP_VERSION_LABEL } from '../version'
+import { CloseConfirmDialog } from './CloseConfirmDialog'
 import { UpdateDialog } from './UpdateDialog'
 
 interface Props {
@@ -220,40 +221,12 @@ export function SettingsMenu({
 
       <UpdateDialog update={update} />
 
-      {confirmOpen && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={cancelClose}
-        >
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="close-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="close-title">¿Cerrar Lectura Fiel?</h2>
-            <p>
-              Se cerrará la ventana y se terminarán todos los procesos de la
-              aplicación.
-            </p>
-            <div className="modal-actions">
-              <button type="button" className="btn ghost" onClick={cancelClose}>
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={confirmClose}
-                disabled={closing}
-              >
-                {closing ? 'Cerrando…' : 'Cerrar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CloseConfirmDialog
+        open={confirmOpen}
+        closing={closing}
+        onCancel={cancelClose}
+        onConfirm={confirmClose}
+      />
     </div>
   )
 }

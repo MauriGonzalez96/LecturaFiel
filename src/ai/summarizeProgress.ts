@@ -8,13 +8,13 @@ import {
 import type { ChapterSummary, ProgressSummary } from './types'
 
 const MAX_OUTPUT_TOKENS = 2800
-const PROMPT_VERSION = 'progreso-detallado-v1'
+const PROMPT_VERSION = 'progreso-neutro-v2'
 
-const SYSTEM_PROMPT = `Sos un editor de audiolibros en español. Te pasan explicaciones detalladas de capítulos ya hechas.
-Redactá un «hasta aquí» del arco del libro: qué se estableció, cómo avanzó el argumento y dónde queda el lector.
+const SYSTEM_PROMPT = `Redactá en español un «hasta aquí» del arco del libro a partir de explicaciones de capítulos ya hechas: qué se estableció, cómo avanzó el argumento y dónde queda la lectura.
 Reglas:
+- Tono expositivo y neutro. Sin tuteo ni segunda persona («vos», «tú», «te cuento»).
 - No inventes capítulos que no estén en los textos dados.
-- Conservá matices importantes; no reduzcas todo a una slogan.
+- Conservá matices importantes; no reduzcas todo a un slogan.
 - Español claro, párrafos cortos, apto para voz alta.
 - Longitud: aprox. 3–6 minutos de lectura en voz (unas 450–900 palabras), según lo rico que sea el material.
 - Sin listas interminables ni spoilers de lo que no vino aún.

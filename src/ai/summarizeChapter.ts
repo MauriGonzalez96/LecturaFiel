@@ -14,26 +14,27 @@ import type { ChapterSummary } from './types'
 const CHUNK_CHARS = 10_000
 const MAX_OUTPUT_TOKENS = 4096
 /** Cambia esto para invalidar cachés de resúmenes viejos. */
-const PROMPT_VERSION = 'esencia-conceptos-v3'
+const PROMPT_VERSION = 'explicacion-neutra-v4'
 
 export function chapterSummaryCacheKey(text: string): string {
   return textHash(`${PROMPT_VERSION}\n${text.replace(/\s+/g, ' ').trim()}`)
 }
 
-const SYSTEM_PROMPT = `Sos quien leyó este capítulo con atención y pasión, y ahora se lo contás a un amigo inteligente en español, en voz alta. No sos un abstract académico ni un telegrama: sos la persona que entiende al autor y quiere que el otro también lo entienda.
+const SYSTEM_PROMPT = `Redactá en español una EXPLICACIÓN DETALLADA del capítulo para audiolibro. El texto debe transmitir la esencia del autor: qué sostiene, por qué, y con qué conceptos.
 
-Tu trabajo: una EXPLICACIÓN DETALLADA que transmita la esencia del capítulo — qué sostiene el autor, por qué, y con qué conceptos.
+Reglas de tono:
+- Tono expositivo y neutro. NO tutees ni hables al oyente («vos», «tú», «escuchame», «te cuento», «prestá atención»).
+- No uses segunda persona. Escribí como una explicación clara en tercera persona o impersonal.
+- Prosa viva y fiel, sin sonar a panfleto ni a chat informal.
 
-Reglas:
-- Presentá e introducí los conceptos del autor: nombrá la idea, explicá qué significa y para qué la usa en este tramo.
-- Explicá cada concepto EN CONTEXTO: cómo encaja en el argumento, qué problema responde, qué contraste o peligro señala el autor.
-- Si te paso una lista de «conceptos difíciles» (palabras que Lectura Fiel intercambió o puso en glosario), DEBELAS tejer en la narración: presentá el término del autor, explicá su sentido y decí en qué contexto del capítulo aparece. No hagas una lista suelta al final: integralos donde corresponden en el relato.
-- Contá el desarrollo del razonamiento (pasos, objeciones, matices), no solo la conclusión.
-- Conservá el “golpe” del autor: la tensión, la advertencia o la intuición central, con calor humano pero sin inventar.
-- Podés citar o parafrasear de cerca frases clave (entre comillas si son literales).
-- Recortá solo repetición pura y relleno; no aplastés la riqueza del pensamiento.
-- No inventes ideas, ejemplos ni conceptos que no estén en el texto ni en la lista de conceptos.
-- Prosa clara, párrafos cortos, tono vivo y fiel, apto para escuchar.
+Contenido:
+- Introducí los conceptos del autor: nombrá la idea, explicá qué significa y para qué la usa en este tramo.
+- Explicá cada concepto EN CONTEXTO: cómo encaja en el argumento, qué problema responde, qué contraste o peligro señala.
+- Si hay una lista de «conceptos difíciles» (intercambiados o en glosario), tejelos en la narración con su sentido y contexto. No los dejes como lista al final.
+- Desarrollá el razonamiento (pasos, objeciones, matices), no solo la conclusión.
+- Conservá distinciones importantes; podés citar frases clave entre comillas si son literales.
+- Recortá solo repetición pura y relleno.
+- No inventes ideas que no estén en el texto ni en la lista de conceptos.
 - Sin markdown, sin listas interminables, sin cercas de código: solo prosa.
 - Longitud orientativa: aprox. 25–45% del original (más si es denso; menos solo si era muy reiterativo).`
 
@@ -80,7 +81,7 @@ async function summarizePiece(
           `Capítulo: «${title}» (${partLabel})\n\n` +
           `Texto:\n${piece}` +
           `${conceptsBlock(concepts)}\n` +
-          `Contame este tramo como quien leyó el libro con pasión: introducí los conceptos del autor (y los de la lista si hay), explicálos en contexto y no pierdas la esencia del argumento.`,
+          `Redactá la explicación detallada de este tramo: conceptos del autor (y los de la lista si hay) en contexto, sin tuteo y sin perder la esencia del argumento.`,
       },
     ],
     { temperature: 0.25, maxTokens: MAX_OUTPUT_TOKENS, signal },
@@ -149,8 +150,8 @@ export async function summarizeChapter(opts: {
           content:
             `Capítulo: «${opts.title}»\n` +
             `${conceptsBlock(concepts)}\n` +
-            `Estas son explicaciones parciales del mismo capítulo. Fusionálas en UNA sola narración coherente, ` +
-            `como quien cuenta la esencia del capítulo entero: conceptos introducidos y explicados en contexto, sin repeticiones ni pérdida de matices:\n\n` +
+            `Estas son explicaciones parciales del mismo capítulo. Fusionálas en UNA sola explicación coherente del capítulo entero: ` +
+            `conceptos en contexto, sin tuteo, sin repeticiones ni pérdida de matices:\n\n` +
             partials.map((p, i) => `--- Parte ${i + 1} ---\n${p}`).join('\n\n'),
         },
       ],
