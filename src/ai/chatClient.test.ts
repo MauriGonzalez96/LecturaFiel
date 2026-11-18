@@ -81,8 +81,45 @@ describe('chatCompletion fallback de modelo', () => {
     )
     // migrateAiModel convierte 2.0 → 3-flash-preview antes del primer intento
     expect(firstBody.model).toBe('gemini-3-flash-preview')
+    expect(firstBody.reasoning_effort).toBe('minimal')
     expect(secondBody.model).not.toBe(firstBody.model)
     expect(saveAiConfig).toHaveBeenCalled()
+  })
+
+  it('sube max_tokens si Gemini responde vacío por length', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              finish_reason: 'length',
+              message: { role: 'assistant' },
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'texto ok' } }],
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const text = await chatCompletion([{ role: 'user', content: 'hola' }], {
+      maxTokens: 256,
+    })
+    expect(text).toBe('texto ok')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const first = JSON.parse(
+      String((fetchMock.mock.calls[0]![1] as RequestInit).body),
+    )
+    const second = JSON.parse(
+      String((fetchMock.mock.calls[1]![1] as RequestInit).body),
+    )
+    expect(second.max_tokens).toBeGreaterThan(first.max_tokens)
   })
 
   it('reintenta si el modelo responde 503 por demanda', async () => {

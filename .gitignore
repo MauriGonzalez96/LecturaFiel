@@ -1,7 +1,11 @@
 node_modules
 dist
+tmp/
+*.pdf
 .DS_Store
 *.local
+.env
+.env.*
 .vscode/*
 !.vscode/extensions.json
 tsconfig.tsbuildinfo

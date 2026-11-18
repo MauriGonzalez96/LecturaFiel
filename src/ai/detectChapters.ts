@@ -3,24 +3,26 @@ import { aiConfigured, loadAiConfig } from './config'
 import type { BookChapter } from '../ingest/types'
 import { renumberChapters, wordCount } from '../ingest/editChapters'
 
-const PREVIEW_CHARS = 700
+const PREVIEW_CHARS = 420
 const WINDOW_CHARS = 2800
-const MAX_SAMPLES = 40
-const MAX_OUTPUT_TOKENS = 2000
+const MAX_SAMPLES = 36
+const MAX_OUTPUT_TOKENS = 3500
 
 const SYSTEM_PROMPT = `Sos un editor que detecta capítulos reales en libros en español.
 Te paso fragmentos numerados (muestras) en orden del libro.
-Respondé SOLO un JSON válido (sin markdown) con esta forma:
+Respondé ÚNICAMENTE un objeto JSON válido, sin markdown, sin comentarios y sin texto alrededor.
+Forma exacta:
 {"chapters":[{"title":"string","startSample":0}]}
 
 Reglas:
-- startSample es el índice de la muestra donde EMPIEZA cada capítulo (0-based).
+- startSample es el índice de la muestra donde EMPIEZA cada capítulo (entero 0-based).
 - El primer capítulo debe empezar en 0.
 - startSample debe ser estrictamente creciente.
 - Preferí cortes literarios (Capítulo, Parte, cambios claros de tema).
 - No inventes contenido: solo títulos cortos y puntos de corte.
 - Si el libro es un solo ensayo sin cortes, devolvé 1 capítulo con título razonable.
-- Máximo 30 capítulos.`
+- Máximo 30 capítulos.
+- No uses comillas tipográficas ni trailing commas.`
 
 type Sample = {
   index: number
@@ -34,6 +36,8 @@ export type DetectChaptersResult = {
   sampleCount: number
   model: string
 }
+
+type Cut = { title: string; startSample: number }
 
 /**
  * Propone una nueva partición usando IA sobre muestras del texto.
@@ -73,15 +77,48 @@ export async function detectChaptersWithAi(opts: {
         role: 'user',
         content:
           `Libro: «${opts.bookTitle}»\n` +
-          `Hay ${samples.length} muestras en orden.\n\n` +
+          `Hay ${samples.length} muestras en orden (índices 0..${samples.length - 1}).\n\n` +
           `${userPayload}\n\n` +
-          `Devolvé el JSON con los capítulos detectados.`,
+          `Devolvé SOLO el JSON {"chapters":[...]} con los capítulos detectados.`,
       },
     ],
-    { temperature: 0.2, maxTokens: MAX_OUTPUT_TOKENS, signal: opts.signal },
+    { temperature: 0.1, maxTokens: MAX_OUTPUT_TOKENS, signal: opts.signal },
   )
 
-  const cuts = parseCuts(raw, samples.length)
+  let cuts: Cut[]
+  try {
+    cuts = parseCuts(raw, samples.length)
+  } catch (firstErr) {
+    // Un intento de reparación: muchos modelos envuelven o truncan el JSON.
+    const repaired = await chatCompletion(
+      [
+        {
+          role: 'system',
+          content:
+            'Convertí la respuesta a JSON válido con forma ' +
+            '{"chapters":[{"title":"string","startSample":0}]}. ' +
+            'Sin markdown ni texto extra. Conservá títulos y startSample si se entienden.',
+        },
+        {
+          role: 'user',
+          content:
+            `Hay ${samples.length} muestras (0..${samples.length - 1}).\n` +
+            `Repará este contenido y devolvé SOLO el JSON:\n\n${raw.slice(0, 6000)}`,
+        },
+      ],
+      { temperature: 0, maxTokens: MAX_OUTPUT_TOKENS, signal: opts.signal },
+    )
+    try {
+      cuts = parseCuts(repaired, samples.length)
+    } catch {
+      const hint =
+        firstErr instanceof Error ? firstErr.message : 'JSON inválido'
+      throw new Error(
+        `${hint} Probá de nuevo; si sigue fallando, editá los cortes a mano.`,
+      )
+    }
+  }
+
   const chapters = applyCuts(fullText, samples, cuts)
   if (chapters.length === 0) {
     throw new Error('La IA no devolvió cortes utilizables.')
@@ -90,7 +127,7 @@ export async function detectChaptersWithAi(opts: {
   return {
     chapters: renumberChapters(chapters),
     sampleCount: samples.length,
-    model: config.model,
+    model: loadAiConfig().model,
   }
 }
 
@@ -146,18 +183,28 @@ export function buildSamples(
   return samples
 }
 
-export function parseCuts(
-  raw: string,
-  sampleCount: number,
-): { title: string; startSample: number }[] {
-  const jsonText = extractJsonObject(raw)
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(jsonText)
-  } catch {
-    throw new Error('La IA no devolvió JSON válido para los capítulos.')
+export function parseCuts(raw: string, sampleCount: number): Cut[] {
+  const candidates = collectJsonCandidates(raw)
+  let lastError = 'La IA no devolvió JSON válido para los capítulos.'
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown
+      const cuts = cutsFromParsed(parsed, sampleCount)
+      if (cuts) return cuts
+      lastError = 'La IA no listó capítulos.'
+    } catch {
+      /* probar siguiente candidato */
+    }
   }
 
+  throw new Error(lastError)
+}
+
+function cutsFromParsed(
+  parsed: unknown,
+  sampleCount: number,
+): Cut[] | null {
   const list = Array.isArray(parsed)
     ? parsed
     : parsed &&
@@ -166,28 +213,32 @@ export function parseCuts(
       ? (parsed as { chapters: unknown[] }).chapters
       : null
 
-  if (!list || list.length === 0) {
-    throw new Error('La IA no listó capítulos.')
-  }
+  if (!list || list.length === 0) return null
 
-  const cuts: { title: string; startSample: number }[] = []
+  const cuts: Cut[] = []
   for (const item of list.slice(0, 30)) {
     if (!item || typeof item !== 'object') continue
-    const row = item as { title?: unknown; startSample?: unknown }
-    const startSample = Number(row.startSample)
+    const row = item as Record<string, unknown>
+    const startRaw =
+      row.startSample ??
+      row.start_sample ??
+      row.sampleIndex ??
+      row.sample_index ??
+      row.sample ??
+      row.start
+    const startSample = Number(startRaw)
     if (!Number.isFinite(startSample)) continue
     const idx = Math.max(0, Math.min(sampleCount - 1, Math.floor(startSample)))
+    const titleRaw = row.title ?? row.name ?? row.chapter
     const title =
-      typeof row.title === 'string' && row.title.trim()
-        ? row.title.trim().slice(0, 120)
+      typeof titleRaw === 'string' && titleRaw.trim()
+        ? titleRaw.trim().slice(0, 120)
         : `Capítulo ${cuts.length + 1}`
     if (cuts.length > 0 && idx <= cuts[cuts.length - 1]!.startSample) continue
     cuts.push({ title, startSample: idx })
   }
 
-  if (cuts.length === 0) {
-    throw new Error('No se pudieron interpretar los cortes de la IA.')
-  }
+  if (cuts.length === 0) return null
   if (cuts[0]!.startSample !== 0) {
     cuts.unshift({
       title: 'Inicio / preliminares',
@@ -200,7 +251,7 @@ export function parseCuts(
 export function applyCuts(
   fullText: string,
   samples: Sample[],
-  cuts: { title: string; startSample: number }[],
+  cuts: Cut[],
 ): BookChapter[] {
   const chapters: BookChapter[] = []
   for (let i = 0; i < cuts.length; i++) {
@@ -234,10 +285,25 @@ export function summarizePartition(chapters: BookChapter[]): {
   }
 }
 
-function extractJsonObject(raw: string): string {
+/** Extrae candidatos JSON (objeto/array) saneados a partir de texto libre. */
+export function collectJsonCandidates(raw: string): string[] {
   const trimmed = raw.trim()
+  if (!trimmed) return []
+
+  const out: string[] = []
+  const push = (s: string) => {
+    const cleaned = sanitizeJsonText(s)
+    if (cleaned && !out.includes(cleaned)) out.push(cleaned)
+  }
+
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fence?.[1]) return fence[1].trim()
+  if (fence?.[1]) push(fence[1])
+
+  for (const extracted of extractBalancedJsonChunks(trimmed)) {
+    push(extracted)
+  }
+
+  // Último recurso: desde el primer { o [ hasta el final, saneado.
   const startObj = trimmed.indexOf('{')
   const startArr = trimmed.indexOf('[')
   const start =
@@ -246,6 +312,59 @@ function extractJsonObject(raw: string): string {
       : startArr < 0
         ? startObj
         : Math.min(startObj, startArr)
-  if (start < 0) return trimmed
-  return trimmed.slice(start)
+  if (start >= 0) push(trimmed.slice(start))
+
+  return out
+}
+
+function extractBalancedJsonChunks(text: string): string[] {
+  const chunks: string[] = []
+  for (let i = 0; i < text.length; i++) {
+    const open = text[i]
+    if (open !== '{' && open !== '[') continue
+    const close = open === '{' ? '}' : ']'
+    let depth = 0
+    let inString = false
+    let escape = false
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j]!
+      if (inString) {
+        if (escape) {
+          escape = false
+          continue
+        }
+        if (ch === '\\') {
+          escape = true
+          continue
+        }
+        if (ch === '"') inString = false
+        continue
+      }
+      if (ch === '"') {
+        inString = true
+        continue
+      }
+      if (ch === open) depth++
+      else if (ch === close) {
+        depth--
+        if (depth === 0) {
+          chunks.push(text.slice(i, j + 1))
+          i = j
+          break
+        }
+      }
+    }
+  }
+  return chunks
+}
+
+function sanitizeJsonText(input: string): string {
+  let s = input.trim()
+  // Comillas tipográficas → ASCII
+  s = s.replace(/[\u201C\u201D\u201E\u201F]/g, '"').replace(/[\u2018\u2019]/g, "'")
+  // Trailing commas antes de } o ]
+  s = s.replace(/,\s*([\]}])/g, '$1')
+  // A veces el modelo deja un prefijo "json"
+  s = s.replace(/^json\s*/i, '')
+  return s.trim()
 }

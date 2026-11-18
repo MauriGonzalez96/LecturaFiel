@@ -15,7 +15,8 @@ Reglas:
 - No inventes capítulos que no estén en los resúmenes.
 - Español claro, párrafos cortos, apto para voz alta.
 - 1–3 minutos de lectura en voz (aprox. 180–450 palabras).
-- Sin listas interminables ni spoilers de lo que no vino aún.`
+- Sin listas interminables ni spoilers de lo que no vino aún.
+- Sin markdown, sin títulos con **, sin viñetas: solo prosa.`
 
 /**
  * Sintetiza el progreso del libro a partir de resúmenes de capítulos 0..upToIndex.

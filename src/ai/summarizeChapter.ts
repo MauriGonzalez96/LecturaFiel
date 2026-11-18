@@ -20,7 +20,8 @@ Reglas:
 - Español claro, párrafos cortos, tono serio pero accesible.
 - Aptitud para lectura en voz alta (frases naturales, sin listas interminables).
 - Si el capítulo es introductorio o de transición, decilo en una frase y resumí el aporte real.
-- Longitud: lo necesario para entender la idea (aprox. 5–12% del original, o menos si era muy reiterativo).`
+- Longitud: lo necesario para entender la idea (aprox. 5–12% del original, o menos si era muy reiterativo).
+- Sin markdown ni cercas de código: solo prosa en español.`
 
 function chunkText(text: string): string[] {
   const clean = text.replace(/\s+/g, ' ').trim()

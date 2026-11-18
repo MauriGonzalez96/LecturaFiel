@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyCuts,
   buildSamples,
+  collectJsonCandidates,
   joinBookText,
   parseCuts,
 } from './detectChapters'
@@ -28,6 +29,31 @@ describe('detectChapters helpers', () => {
       { title: 'Medio', startSample: 2 },
       { title: 'Final', startSample: 5 },
     ])
+  })
+
+  it('acepta markdown, trailing commas y start_sample', () => {
+    const raw = `
+Aquí va el resultado:
+\`\`\`json
+{
+  "chapters": [
+    { "title": "Prólogo", "start_sample": 0, },
+    { "title": "Capítulo I", "startSample": 4, },
+  ],
+}
+\`\`\`
+`
+    const cuts = parseCuts(raw, 10)
+    expect(cuts.map((c) => c.title)).toEqual(['Prólogo', 'Capítulo I'])
+    expect(cuts[1]!.startSample).toBe(4)
+  })
+
+  it('extrae el objeto balanceado aunque haya texto alrededor', () => {
+    const raw =
+      'Listo.\n{"chapters":[{"title":"A","startSample":0},{"title":"B","startSample":2}]}\nFin.'
+    const candidates = collectJsonCandidates(raw)
+    expect(candidates.some((c) => c.startsWith('{"chapters"'))).toBe(true)
+    expect(parseCuts(raw, 5)).toHaveLength(2)
   })
 
   it('fuerza el primer corte en 0', () => {
