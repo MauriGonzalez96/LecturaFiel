@@ -7,6 +7,8 @@ interface Props {
   onSelect: (bookId: string) => void
   onRemove: (bookId: string) => void
   onDemo?: () => void
+  /** Oculta los slots vacíos (sidebar compacta). */
+  compact?: boolean
 }
 
 export function LibraryShelf({
@@ -15,15 +17,17 @@ export function LibraryShelf({
   onSelect,
   onRemove,
   onDemo,
+  compact = false,
 }: Props) {
-  const emptyCount = MAX_LIBRARY_SLOTS - slots.length
+  const emptyCount = compact ? 0 : MAX_LIBRARY_SLOTS - slots.length
 
   return (
-    <div className="library-shelf">
+    <div className={`library-shelf${compact ? ' compact' : ''}`}>
       <div className="library-shelf-head">
-        <h3>Biblioteca</h3>
+        <h3>{compact ? 'Biblioteca activa' : 'Biblioteca'}</h3>
         <span className="library-count">
-          {slots.length}/{MAX_LIBRARY_SLOTS} libros
+          {slots.length}/{MAX_LIBRARY_SLOTS}
+          {compact ? '' : ' libros'}
         </span>
       </div>
 
@@ -32,6 +36,10 @@ export function LibraryShelf({
           const ch = slot.book.chapters[slot.chapterIndex]
           const active = slot.book.id === activeBookId
           const hasPages = slot.book.chapters.some((c) => c.pageFrom != null)
+          const progressPct = Math.round(
+            ((slot.chapterIndex + 1) / Math.max(1, slot.book.chapters.length)) *
+              100,
+          )
           return (
             <div
               key={slot.book.id}
@@ -47,18 +55,29 @@ export function LibraryShelf({
                 </span>
                 <span className="slot-title">{slot.book.title}</span>
                 <span className="slot-progress">
-                  {hasPages
-                    ? `Pág. ${ch?.pageFrom ?? slot.chapterIndex + 1}/${slot.book.chapters.length}`
-                    : `Cap. ${slot.chapterIndex + 1}/${slot.book.chapters.length}`}
-                  {(slot.sentenceIndex ?? 0) > 0
+                  {compact
+                    ? `${progressPct}% · Cap. ${slot.chapterIndex + 1}/${slot.book.chapters.length}`
+                    : hasPages
+                      ? `Pág. ${ch?.pageFrom ?? slot.chapterIndex + 1}/${slot.book.chapters.length}`
+                      : `Cap. ${slot.chapterIndex + 1}/${slot.book.chapters.length}`}
+                  {!compact && (slot.sentenceIndex ?? 0) > 0
                     ? ` · or. ${(slot.sentenceIndex ?? 0) + 1}`
                     : ''}
-                  {ch?.chapterLabel
-                    ? ` · ${truncate(ch.chapterLabel, 28)}`
-                    : ch
-                      ? ` · ${truncate(ch.title, 28)}`
-                      : ''}
+                  {!compact &&
+                    (ch?.chapterLabel
+                      ? ` · ${truncate(ch.chapterLabel, 28)}`
+                      : ch
+                        ? ` · ${truncate(ch.title, 28)}`
+                        : '')}
                 </span>
+                {compact && (
+                  <span
+                    className="slot-progress-bar"
+                    aria-hidden="true"
+                  >
+                    <span style={{ width: `${progressPct}%` }} />
+                  </span>
+                )}
               </button>
               <button
                 type="button"

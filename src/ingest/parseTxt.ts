@@ -1,16 +1,27 @@
 import type { ParsedBook } from './types'
-import { cleanupExtractedText, detectFormat, splitIntoChapters } from './textCleanup'
+import { assessSplitConfidence } from './splitConfidence'
+import {
+  cleanupExtractedText,
+  detectFormat,
+  splitIntoChaptersDetailed,
+} from './textCleanup'
 
 export async function parsePlainText(file: File): Promise<ParsedBook> {
   const raw = await file.text()
   const text = cleanupExtractedText(raw)
   const baseTitle = file.name.replace(/\.[^.]+$/, '')
-  const chapters = splitIntoChapters(text, baseTitle)
+  const format = detectFormat(file.name)
+  const { chapters, kind } = splitIntoChaptersDetailed(text, baseTitle)
 
   return {
     title: baseTitle,
     sourceName: file.name,
-    format: detectFormat(file.name),
+    format,
     chapters,
+    splitConfidence: assessSplitConfidence({
+      format,
+      chapters,
+      textSplitKind: kind,
+    }),
   }
 }

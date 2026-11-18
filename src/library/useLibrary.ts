@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { IngestedBook } from '../ingest/types'
+import { cloneChapters } from '../ingest/editChapters'
+import type { BookChapter, IngestedBook, SplitConfidence } from '../ingest/types'
 import {
   emptyLibraryState,
   loadLibraryState,
@@ -177,6 +178,56 @@ export function useLibrary() {
     })
   }, [])
 
+  /**
+   * Reemplaza la partición de capítulos del libro (edición manual).
+   * Guarda `sourceChapters` la primera vez para poder restablecer.
+   */
+  const updateBookChapters = useCallback(
+    (
+      bookId: string,
+      chapters: BookChapter[],
+      opts?: {
+        splitConfidence?: SplitConfidence
+        chapterIndex?: number
+        resetSource?: boolean
+      },
+    ) => {
+      if (chapters.length === 0) return
+      setState((prev) => ({
+        ...prev,
+        slots: prev.slots.map((s) => {
+          if (s.book.id !== bookId) return s
+          const sourceChapters =
+            opts?.resetSource
+              ? cloneChapters(chapters)
+              : (s.book.sourceChapters ?? cloneChapters(s.book.chapters))
+          const nextIndex = Math.max(
+            0,
+            Math.min(
+              opts?.chapterIndex ?? s.chapterIndex,
+              chapters.length - 1,
+            ),
+          )
+          return {
+            ...s,
+            book: {
+              ...s.book,
+              chapters,
+              sourceChapters,
+              splitConfidence:
+                opts?.splitConfidence ?? s.book.splitConfidence ?? 'medium',
+            },
+            chapterIndex: nextIndex,
+            sentenceIndex: 0,
+            updatedAt: new Date().toISOString(),
+          }
+        }),
+        activeBookId: bookId,
+      }))
+    },
+    [],
+  )
+
   const clearLibrary = useCallback(() => {
     setState(emptyLibraryState())
   }, [])
@@ -194,6 +245,7 @@ export function useLibrary() {
     setActiveBook,
     setChapterIndex,
     setSentenceIndex,
+    updateBookChapters,
     removeBook,
     clearLibrary,
     maxSlots: MAX_LIBRARY_SLOTS,

@@ -40,17 +40,17 @@ Cada build legacy va a `release\vX.Y.Z\`.
 
 ## Versión y actualizaciones
 
-La versión vive en `package.json` (hoy `0.3.10`).
+La versión vive en `package.json` (hoy `0.3.11`).
 
 ### Publicar una versión (automático)
 
-1. Subí la versión en `package.json` (ej. `0.3.10`).
+1. Subí la versión en `package.json` (ej. `0.3.11`).
 2. Commit y push a `main`.
 3. Creá y pusheá el tag:
 
 ```bash
-git tag v0.3.10
-git push origin v0.3.10
+git tag v0.3.11
+git push origin v0.3.11
 ```
 
 4. GitHub Actions publica:
@@ -89,6 +89,7 @@ Los datos (voces Piper, preferencias) se guardan en `%LOCALAPPDATA%\LecturaFiel`
 - Capítulo demo + glosario + **Repaso**
 - Audio: **Piper** (modelo local), Windows y Neural Edge (online)
 - Pestaña **Voces**: listar, escuchar muestra, descargar Piper y guardar
+- **Resumen IA por capítulo**: idea fundamental sin rodeos (API OpenAI-compatible / Ollama); se escucha con «Resumen IA»
 - Primera apertura del exe: descarga `es_AR-daniela-high` (Piper) y la usa
 - Caché de decisiones en `localStorage`
 

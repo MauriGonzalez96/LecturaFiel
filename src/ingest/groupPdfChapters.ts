@@ -10,19 +10,31 @@ type PageDraft = {
   literaryChapter: number
 }
 
+export type GroupPdfResult = {
+  chapters: BookChapter[]
+  usedPageChunks: boolean
+}
+
 /**
  * Agrupa páginas PDF en unidades de lectura:
  * - Con encabezados «Capítulo N»: un ítem por capítulo literario (rango de páginas).
  * - Sin encabezados: bloques de PDF_PAGES_PER_CHUNK páginas.
  */
 export function groupPdfPages(pages: PageDraft[]): BookChapter[] {
-  if (pages.length === 0) return []
+  return groupPdfPagesDetailed(pages).chapters
+}
+
+export function groupPdfPagesDetailed(pages: PageDraft[]): GroupPdfResult {
+  if (pages.length === 0) return { chapters: [], usedPageChunks: false }
 
   const hasLiterary = pages.some((p) => p.literaryChapter > 0)
   if (hasLiterary) {
-    return groupByLiterary(pages)
+    return { chapters: groupByLiterary(pages), usedPageChunks: false }
   }
-  return groupByPageChunks(pages, PDF_PAGES_PER_CHUNK)
+  return {
+    chapters: groupByPageChunks(pages, PDF_PAGES_PER_CHUNK),
+    usedPageChunks: true,
+  }
 }
 
 function groupByLiterary(pages: PageDraft[]): BookChapter[] {

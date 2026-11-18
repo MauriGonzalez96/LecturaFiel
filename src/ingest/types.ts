@@ -1,5 +1,8 @@
 export type BookFormat = 'txt' | 'epub' | 'pdf' | 'md' | 'unknown'
 
+/** Calidad de la partición en capítulos (heurística, sin IA). */
+export type SplitConfidence = 'high' | 'medium' | 'low'
+
 export interface BookChapter {
   number: number
   title: string
@@ -19,6 +22,8 @@ export interface ParsedBook {
   sourceName: string
   format: BookFormat
   chapters: BookChapter[]
+  /** Señal de calidad del corte en capítulos. */
+  splitConfidence?: SplitConfidence
 }
 
 export interface IngestedBook extends ParsedBook {
@@ -26,4 +31,9 @@ export interface IngestedBook extends ParsedBook {
   id: string
   sourceSize?: number
   sourceModified?: number
+  /**
+   * Copia de la partición original (tras ingestión o primer guardado).
+   * Sirve para «Restablecer partición».
+   */
+  sourceChapters?: BookChapter[]
 }

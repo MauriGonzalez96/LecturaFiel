@@ -1,31 +1,13 @@
+import { IDB_STORES, openLecturaDb } from '../data/idb'
 import type { GlossaryVaultFile } from './types'
 import { emptyVault } from './types'
 
-const DB_NAME = 'lectura-fiel'
-const DB_VERSION = 2
-const STORE = 'glossary-vault'
+const STORE = IDB_STORES.glossaryVault
 const KEY = 'vault'
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
-    req.onerror = () => reject(req.error ?? new Error('IndexedDB no disponible'))
-    req.onsuccess = () => resolve(req.result)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains('library')) {
-        db.createObjectStore('library')
-      }
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE)
-      }
-    }
-  })
-}
 
 export async function loadVault(): Promise<GlossaryVaultFile> {
   try {
-    const db = await openDb()
+    const db = await openLecturaDb()
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readonly')
       const req = tx.objectStore(STORE).get(KEY)
@@ -45,12 +27,13 @@ export async function loadVault(): Promise<GlossaryVaultFile> {
 }
 
 export async function saveVault(vault: GlossaryVaultFile): Promise<void> {
-  const db = await openDb()
+  const db = await openLecturaDb()
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite')
     tx.objectStore(STORE).put(vault, KEY)
     tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error ?? new Error('No se pudo guardar el glosario'))
+    tx.onerror = () =>
+      reject(tx.error ?? new Error('No se pudo guardar el glosario'))
   })
 }
 

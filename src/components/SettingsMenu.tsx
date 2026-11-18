@@ -19,6 +19,7 @@ interface Props {
   onInterventionApplied?: (mode: InterventionMode) => void
   onOpenEveryday?: () => void
   everydayCount?: number
+  onOpenAi?: () => void
 }
 
 /** Tuerca de configuración (voces, updates, caché, demo, cerrar). */
@@ -32,6 +33,7 @@ export function SettingsMenu({
   onInterventionApplied,
   onOpenEveryday,
   everydayCount = 0,
+  onOpenAi,
 }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -149,6 +151,17 @@ export function SettingsMenu({
           >
             Voces y velocidad
           </button>
+
+          {onOpenAi && (
+            <button
+              type="button"
+              role="menuitem"
+              className="settings-item"
+              onClick={() => run(onOpenAi)}
+            >
+              Resúmenes IA…
+            </button>
+          )}
 
           <button
             type="button"

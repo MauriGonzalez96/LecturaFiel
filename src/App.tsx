@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SAMPLE_CHAPTER } from './data/sampleChapter'
 import { decisionCache } from './engine/decisionCache'
 import { usePipelineResult } from './hooks/usePipelineResult'
@@ -8,7 +8,10 @@ import { GlossaryQuiz } from './components/GlossaryQuiz'
 import { StatsBar } from './components/StatsBar'
 import { InterventionNotice } from './components/InterventionNotice'
 import { EverydayVocabPanel } from './components/EverydayVocabPanel'
-import type { InterventionMode } from './settings/intervention'
+import {
+  INTERVENTION_OPTIONS,
+  type InterventionMode,
+} from './settings/intervention'
 import { AudioPlayer } from './components/AudioPlayer'
 import { ChangeLog } from './components/ChangeLog'
 import { FileUpload } from './components/FileUpload'
@@ -16,17 +19,33 @@ import { BookNav } from './components/BookNav'
 import { LibraryShelf } from './components/LibraryShelf'
 import { SettingsMenu } from './components/SettingsMenu'
 import { VoiceStudio } from './components/VoiceStudio'
+import { AiSettingsPanel } from './components/AiSettingsPanel'
+import {
+  buildSummaryChapterOptions,
+  ChapterSummaryPanel,
+} from './components/ChapterSummaryPanel'
+import { ChapterSplitEditor } from './components/ChapterSplitEditor'
+import { AiSplitProposal } from './components/AiSplitProposal'
+import { canOfferAiSplit, needsAiSplit } from './ingest/needsAiSplit'
 import { useLibrary } from './library/useLibrary'
 import { useGlossaryVault } from './glossary/useGlossaryVault'
 import { useInterventionMode } from './hooks/useInterventionMode'
 import { useUserEveryday } from './hooks/useUserEveryday'
 import { useVoiceSettings } from './hooks/useVoiceSettings'
+import { useChapterSummary } from './hooks/useChapterSummary'
+import { useBookSummaryIndex } from './hooks/useBookSummaryIndex'
+import { useBookSummaryMap } from './hooks/useBookSummaryMap'
+import { useBookSummaryQueue } from './hooks/useBookSummaryQueue'
+import { downloadBookSummariesMarkdown } from './ai/exportBookSummaries'
+import { markSummaryHeard, heardSummaryIndexes } from './ai/summaryHeard'
+import { assessSplitConfidence } from './ingest/splitConfidence'
+import { useProgressSummary } from './hooks/useProgressSummary'
 import { MAX_LIBRARY_SLOTS } from './library/types'
 import { DEMO_ENABLED } from './env'
 import type { IngestedBook } from './ingest/types'
 import { APP_VERSION_LABEL } from './version'
 
-type Tab = 'read' | 'glossary' | 'review' | 'voices' | 'everyday'
+type Tab = 'read' | 'glossary' | 'review' | 'voices' | 'everyday' | 'ai'
 
 export default function App() {
   const library = useLibrary()
@@ -35,11 +54,19 @@ export default function App() {
   const userEveryday = useUserEveryday()
   useVoiceSettings()
   const [demoMode, setDemoMode] = useState(DEMO_ENABLED)
+  const [showAiSettings, setShowAiSettings] = useState(false)
+  const [showSplitEditor, setShowSplitEditor] = useState(false)
+  const [showAiSplit, setShowAiSplit] = useState(false)
   const [demoText, setDemoText] = useState(SAMPLE_CHAPTER.text)
   const [tab, setTab] = useState<Tab>('read')
   const [cacheTick, setCacheTick] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [seekNonce, setSeekNonce] = useState(0)
+  const [listenSummaryNonce, setListenSummaryNonce] = useState(0)
+  const [aiConfigTick, setAiConfigTick] = useState(0)
+  const [summaryIndexTick, setSummaryIndexTick] = useState(0)
+  const [heardTick, setHeardTick] = useState(0)
+  const [listenOverride, setListenOverride] = useState<string | null>(null)
   const [levelNotice, setLevelNotice] = useState(false)
   const [readerFlash, setReaderFlash] = useState(false)
   const prevModeRef = useRef(intervention.mode)
@@ -76,6 +103,92 @@ export default function App() {
     intervention.options,
     pipelineBust,
   )
+
+  const chapterSummary = useChapterSummary({
+    bookId: showDemo ? 'demo' : (book?.id ?? null),
+    chapterIndex: showDemo ? 0 : chapterIndex,
+    title:
+      (showDemo ? SAMPLE_CHAPTER.title : chapterMeta?.title) ||
+      `Capítulo ${chapter}`,
+    text,
+    configTick: aiConfigTick,
+    refreshTick: summaryIndexTick,
+  })
+
+  const summaryQueue = useBookSummaryQueue()
+
+  const summaryChapterTexts = useMemo(() => {
+    if (showDemo) return [demoText]
+    return book?.chapters.map((c) => c.text) ?? []
+  }, [showDemo, demoText, book])
+
+  const summarizedIndexes = useBookSummaryIndex(
+    showDemo ? 'demo' : (book?.id ?? null),
+    summaryChapterTexts,
+    summaryIndexTick,
+  )
+
+  const summaryChapterOptions = useMemo(() => {
+    if (showDemo) {
+      return buildSummaryChapterOptions([
+        {
+          number: SAMPLE_CHAPTER.number,
+          title: SAMPLE_CHAPTER.title,
+          text: demoText,
+        },
+      ])
+    }
+    return book ? buildSummaryChapterOptions(book.chapters) : []
+  }, [showDemo, demoText, book])
+
+  const summaryMapChapters = useMemo(
+    () =>
+      summaryChapterOptions.map((c) => ({
+        index: c.index,
+        title: c.title,
+        text: summaryChapterTexts[c.index] ?? '',
+      })),
+    [summaryChapterOptions, summaryChapterTexts],
+  )
+
+  const summaryMapEntries = useBookSummaryMap(
+    showDemo ? 'demo' : (book?.id ?? null),
+    summaryMapChapters,
+    summaryIndexTick,
+  )
+
+  const readySummariesForProgress = useMemo(
+    () =>
+      summaryMapEntries
+        .filter((e) => e.ready && e.summary)
+        .map((e) => ({
+          chapterIndex: e.index,
+          title: e.title,
+          summary: e.summary!,
+        })),
+    [summaryMapEntries],
+  )
+
+  const progressSummary = useProgressSummary({
+    bookId: showDemo ? 'demo' : (book?.id ?? null),
+    bookTitle: showDemo
+      ? SAMPLE_CHAPTER.title
+      : (book?.title ?? 'Libro'),
+    upToIndex: showDemo ? 0 : chapterIndex,
+    readySummaries: readySummariesForProgress,
+    refreshTick: summaryIndexTick,
+  })
+
+  const heardIndexes = useMemo(() => {
+    const id = showDemo ? 'demo' : book?.id
+    if (!id) return new Set<number>()
+    void heardTick
+    return heardSummaryIndexes(id)
+  }, [showDemo, book?.id, heardTick])
+
+  useEffect(() => {
+    setListenOverride(null)
+  }, [chapterIndex, book?.id, showDemo])
 
   function keepEveryday(word: string) {
     userEveryday.add(word)
@@ -150,13 +263,13 @@ export default function App() {
 
     library.addOrOpenBook(next)
     setDemoMode(false)
-    setTab('read')
+    // Tras subir: ir a Resumen IA con la lista de capítulos detectados.
+    setTab(next.chapters.length > 0 ? 'ai' : 'read')
   }
 
   function selectChapter(index: number) {
     if (!book) return
     library.setChapterIndex(book.id, index)
-    setTab('read')
   }
 
   const hasNextChapter = Boolean(
@@ -176,7 +289,6 @@ export default function App() {
     if (!book || showDemo) return false
     if (chapterIndex >= book.chapters.length - 1) return false
     library.setChapterIndex(book.id, chapterIndex + 1)
-    setTab('read')
     return true
   }
 
@@ -241,57 +353,119 @@ export default function App() {
   const emptyProduction = !DEMO_ENABLED && !book
   const reviewItems =
     bookGlossary.length > 0 ? bookGlossary : result.glossary
+  const modeMeta =
+    INTERVENTION_OPTIONS.find((o) => o.id === intervention.mode) ??
+    INTERVENTION_OPTIONS[2]
+  const modeBadge = `Adaptado N${intervention.mode}`
+  const contextTitle = emptyProduction
+    ? 'Sin libro abierto'
+    : showDemo
+      ? `${SAMPLE_CHAPTER.title} (demo)`
+      : book
+        ? `${book.title} · ${title || `Capítulo ${chapter}`}`
+        : title || `Capítulo ${chapter}`
+
+  const primaryTabs = (
+    [
+      ['read', 'Lectura'],
+      [
+        'glossary',
+        glossaryTabCount > 0 ? `Glosario (${glossaryTabCount})` : 'Glosario',
+      ],
+      [
+        'ai',
+        !showDemo &&
+        book &&
+        summaryChapterOptions.length > 1 &&
+        summarizedIndexes.size > 0
+          ? `Resumen IA (${summarizedIndexes.size}/${summaryChapterOptions.length})`
+          : chapterSummary.summaryText
+            ? 'Resumen IA ✓'
+            : 'Resumen IA',
+      ],
+      ['review', 'Repaso'],
+    ] as const
+  )
+
+  const workspaceTitle =
+    tab === 'voices'
+      ? 'Estudio de voces'
+      : tab === 'ai'
+        ? 'Resumen IA del capítulo'
+        : tab === 'everyday'
+          ? 'Vocabulario cotidiano'
+          : tab === 'glossary' && emptyProduction
+            ? 'Archivo de glosario'
+            : emptyProduction
+              ? 'Esperando un libro'
+              : title || `Capítulo ${chapter}`
 
   return (
-    <div className="app">
+    <div className="app app-shell">
       <div className="atmosphere" aria-hidden="true" />
 
-      <header className="top">
-        <div className="top-row">
-          <div className="brand-block">
-            <p className="brand">Lectura Fiel</p>
-            <h1>El mismo libro. Solo lo excepcional se adapta.</h1>
-            <p className="lede">
-              Hasta {MAX_LIBRARY_SLOTS} libros abiertos a la vez. El glosario se
-              archiva por libro (sin tope) y se puede descargar en JSON.
-            </p>
-          </div>
-          <div className="top-actions">
-            <SettingsMenu
-              onOpenVoices={() => setTab('voices')}
-              onClearCache={clearCache}
-              onDemo={DEMO_ENABLED ? goDemo : undefined}
-              demoEnabled={DEMO_ENABLED}
-              interventionMode={intervention.mode}
-              onInterventionMode={applyInterventionMode}
-              onInterventionApplied={() => {
-                setLevelNotice(true)
-                setTab('read')
-              }}
-              onOpenEveryday={() => setTab('everyday')}
-              everydayCount={userEveryday.count}
-            />
-          </div>
+      <header className="app-chrome">
+        <div className="chrome-brand">
+          <p className="brand">Lectura Fiel</p>
+        </div>
+
+        <div className="chrome-context">
+          <p className="chrome-title">{contextTitle}</p>
+          {!emptyProduction && (
+            <span className="chrome-badge" title={modeMeta.hint}>
+              {modeBadge}
+            </span>
+          )}
+        </div>
+
+        <nav className="chrome-nav" aria-label="Secciones">
+          {primaryTabs.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={
+                tab === id || (id === 'read' && tab === 'voices')
+                  ? 'chrome-nav-btn active'
+                  : 'chrome-nav-btn'
+              }
+              aria-current={tab === id ? 'page' : undefined}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="chrome-actions">
+          <SettingsMenu
+            onOpenVoices={() => setTab('voices')}
+            onClearCache={clearCache}
+            onDemo={DEMO_ENABLED ? goDemo : undefined}
+            demoEnabled={DEMO_ENABLED}
+            interventionMode={intervention.mode}
+            onInterventionMode={applyInterventionMode}
+            onInterventionApplied={() => {
+              setLevelNotice(true)
+              setTab('read')
+            }}
+            onOpenEveryday={() => setTab('everyday')}
+            everydayCount={userEveryday.count}
+            onOpenAi={() => {
+              setShowAiSettings(true)
+              setTab('ai')
+            }}
+          />
         </div>
       </header>
 
-      <main className="layout">
-        <section className="panel input-panel">
-          <div className="panel-head">
-            <h2>Fuente</h2>
+      <main className="layout shell-layout">
+        <aside className="panel sidebar-panel">
+          <div className="sidebar-section">
+            <p className="sidebar-kicker">Fuente &amp; biblioteca</p>
+            <p className="sidebar-meta">
+              {library.slots.length}/{MAX_LIBRARY_SLOTS} volúmenes
+            </p>
           </div>
-
-          {!library.ready ? (
-            <p className="hint">Cargando biblioteca…</p>
-          ) : (
-            <LibraryShelf
-              slots={library.slots}
-              activeBookId={showDemo ? null : library.activeBookId}
-              onSelect={selectLibraryBook}
-              onRemove={removeLibraryBook}
-              onDemo={DEMO_ENABLED ? goDemo : undefined}
-            />
-          )}
 
           <FileUpload onBook={handleBookIngested} />
           {uploadError && <p className="upload-error">{uploadError}</p>}
@@ -313,6 +487,19 @@ export default function App() {
             </p>
           )}
 
+          {!library.ready ? (
+            <p className="hint">Cargando biblioteca…</p>
+          ) : (
+            <LibraryShelf
+              compact
+              slots={library.slots}
+              activeBookId={showDemo ? null : library.activeBookId}
+              onSelect={selectLibraryBook}
+              onRemove={removeLibraryBook}
+              onDemo={DEMO_ENABLED ? goDemo : undefined}
+            />
+          )}
+
           {book && !showDemo && (
             <BookNav
               book={book}
@@ -324,90 +511,84 @@ export default function App() {
 
           {showDemo && (
             <p className="hint">
-              Modo demo (solo desarrollo): texto de ejemplo. Subí un libro para
-              guardarlo en un slot.
+              Modo demo: texto de ejemplo. Subí un libro para ocuparlo en la
+              biblioteca.
             </p>
           )}
 
           {emptyProduction && (
             <p className="hint empty-hint">
-              Subí un PDF, EPUB o TXT para empezar. Si ya habías avanzado en el
-              libro, usá «Ir a página» después de cargarlo.
+              Subí un PDF, EPUB o TXT para empezar.
             </p>
           )}
 
           {(showDemo || book) && (
-            <label className="block">
-              Texto {showDemo ? '(demo, editable)' : 'de la página / capítulo'}
-              <textarea
-                value={text}
-                onChange={
-                  showDemo ? (e) => setDemoText(e.target.value) : undefined
-                }
-                readOnly={!showDemo}
-                rows={12}
-                spellCheck={false}
-              />
-            </label>
+            <details className="source-fold" open={showDemo || emptyProduction}>
+              <summary>
+                Texto {showDemo ? '(demo, editable)' : 'del capítulo'}
+              </summary>
+              <label className="block source-fold-body">
+                <span className="sr-only">
+                  Texto {showDemo ? 'demo editable' : 'del capítulo'}
+                </span>
+                <textarea
+                  value={text}
+                  onChange={
+                    showDemo ? (e) => setDemoText(e.target.value) : undefined
+                  }
+                  readOnly={!showDemo}
+                  rows={showDemo ? 10 : 6}
+                  spellCheck={false}
+                />
+              </label>
+            </details>
           )}
 
-          <p className="hint">
-            En niveles 3–4 se busca lo que no es cotidiano. Podés{' '}
+          <div className="sidebar-foot">
+            <p className="sidebar-level" title={modeMeta.hint}>
+              Nivel léxico · {modeMeta.label.replace(/^\d+\s*—\s*/, '')}
+            </p>
             <button
               type="button"
               className="linkish"
               onClick={() => setTab('everyday')}
             >
-              agregar palabras a tu lista
-            </button>{' '}
-            para que no se cambien. Hasta {MAX_LIBRARY_SLOTS} libros · glosario
-            archivado.
-          </p>
-        </section>
+              Cotidianas
+              {userEveryday.count > 0 ? ` (${userEveryday.count})` : ''}
+            </button>
+          </div>
+        </aside>
 
-        <section className="panel result-panel">
-          <div className="panel-head">
-            <h2>
-              {tab === 'voices'
-                ? 'Estudio de voces'
-                : tab === 'everyday'
-                  ? 'Vocabulario cotidiano'
-                  : tab === 'glossary' && emptyProduction
-                    ? 'Archivo de glosario'
-                    : emptyProduction
-                      ? 'Esperando un libro'
-                      : title || `Capítulo ${chapter}`}
-            </h2>
-            <div className="tabs" role="tablist">
-              {(
-                [
-                  ['read', 'Texto'],
-                  ['glossary', `Glosario (${glossaryTabCount})`],
-                  [
-                    'everyday',
-                    userEveryday.count > 0
-                      ? `Cotidianas (${userEveryday.count})`
-                      : 'Cotidianas',
-                  ],
-                  ['review', 'Repaso'],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === id}
-                  className={tab === id ? 'tab active' : 'tab'}
-                  onClick={() => setTab(id)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+        <section className="panel result-panel workspace-panel">
+          <div className="panel-head workspace-head">
+            <h2>{workspaceTitle}</h2>
+            {tab === 'everyday' && (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setTab('glossary')}
+              >
+                Volver al glosario
+              </button>
+            )}
+            {tab === 'voices' && (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setTab('read')}
+              >
+                Volver a lectura
+              </button>
+            )}
           </div>
 
           {tab === 'voices' ? (
             <VoiceStudio onClose={() => setTab('read')} />
+          ) : tab === 'ai' && emptyProduction ? (
+            <AiSettingsPanel
+              onClose={() => setTab('read')}
+              onSaved={() => setAiConfigTick((n) => n + 1)}
+            />
           ) : tab === 'everyday' ? (
             <EverydayVocabPanel
               words={userEveryday.words}
@@ -422,8 +603,7 @@ export default function App() {
           ) : emptyProduction && tab !== 'glossary' ? (
             <p className="empty-panel">
               Cuando cargues un libro vas a ver el texto adaptado, el glosario y
-              los controles de audio acá. Podés ver el archivo de glosario en la
-              pestaña{' '}
+              los controles de audio acá. Podés ver el archivo en{' '}
               <button
                 type="button"
                 className="linkish"
@@ -435,30 +615,210 @@ export default function App() {
             </p>
           ) : (
             <>
-              {/* Audio queda montado también en Glosario para no cortar la lectura */}
               {tab !== 'review' && !emptyProduction && (
                 <>
-                  {tab !== 'glossary' && (
-                    <StatsBar result={result} mode={intervention.mode} />
+                  {tab === 'read' && (
+                    <>
+                      <StatsBar result={result} mode={intervention.mode} />
+                      {levelNotice && (
+                        <InterventionNotice
+                          mode={intervention.mode}
+                          substituted={result.stats.substituted}
+                          rarity={result.stats.rarityDetected}
+                          glossaryOnly={result.stats.glossaryOnly}
+                          onDismiss={() => setLevelNotice(false)}
+                        />
+                      )}
+                      <ChangeLog
+                        substitutions={result.substitutions}
+                        onKeepEveryday={keepEveryday}
+                      />
+                    </>
                   )}
-                  {tab !== 'glossary' && levelNotice && (
-                    <InterventionNotice
-                      mode={intervention.mode}
-                      substituted={result.stats.substituted}
-                      rarity={result.stats.rarityDetected}
-                      glossaryOnly={result.stats.glossaryOnly}
-                      onDismiss={() => setLevelNotice(false)}
-                    />
-                  )}
-                  {tab !== 'glossary' && (
-                    <ChangeLog
-                      substitutions={result.substitutions}
-                      onKeepEveryday={keepEveryday}
-                    />
+                  {tab === 'ai' && (
+                    <>
+                      {(showAiSettings ||
+                        chapterSummary.status === 'unconfigured') && (
+                        <AiSettingsPanel
+                          onClose={() => setShowAiSettings(false)}
+                          onSaved={() => {
+                            setAiConfigTick((n) => n + 1)
+                            setShowAiSettings(false)
+                          }}
+                        />
+                      )}
+                      {showAiSplit && book && !showDemo ? (
+                        <AiSplitProposal
+                          bookTitle={book.title}
+                          currentChapters={book.chapters}
+                          onNeedSettings={() => setShowAiSettings(true)}
+                          onCancel={() => setShowAiSplit(false)}
+                          onAccept={(nextChapters) => {
+                            library.updateBookChapters(book.id, nextChapters, {
+                              splitConfidence: 'high',
+                              chapterIndex: 0,
+                            })
+                            setSummaryIndexTick((n) => n + 1)
+                            setCacheTick((n) => n + 1)
+                            setShowAiSplit(false)
+                            setShowSplitEditor(false)
+                          }}
+                        />
+                      ) : showSplitEditor && book && !showDemo ? (
+                        <ChapterSplitEditor
+                          chapters={book.chapters}
+                          sourceChapters={book.sourceChapters}
+                          activeIndex={chapterIndex}
+                          onSelect={selectChapter}
+                          onClose={() => setShowSplitEditor(false)}
+                          onApply={(nextChapters, focusIndex) => {
+                            library.updateBookChapters(book.id, nextChapters, {
+                              splitConfidence: 'high',
+                              chapterIndex: focusIndex,
+                            })
+                            setSummaryIndexTick((n) => n + 1)
+                            setCacheTick((n) => n + 1)
+                            setShowSplitEditor(false)
+                          }}
+                        />
+                      ) : (
+                        <ChapterSummaryPanel
+                          status={chapterSummary.status}
+                          summary={chapterSummary.summary}
+                          error={chapterSummary.error}
+                          canRun={chapterSummary.canRun}
+                          onGenerate={(force) => {
+                            void chapterSummary.generate(force).then(() => {
+                              setSummaryIndexTick((n) => n + 1)
+                            })
+                          }}
+                          onCancel={chapterSummary.cancel}
+                          onOpenSettings={() => setShowAiSettings(true)}
+                          onListen={() => {
+                            setListenOverride(null)
+                            setListenSummaryNonce((n) => n + 1)
+                          }}
+                          chapters={summaryChapterOptions}
+                          activeChapterIndex={showDemo ? 0 : chapterIndex}
+                          summarizedIndexes={summarizedIndexes}
+                          heardIndexes={heardIndexes}
+                          bookTitle={
+                            showDemo ? 'Demo' : (book?.title ?? null)
+                          }
+                          progressStatus={progressSummary.status}
+                          progress={progressSummary.progress}
+                          progressError={progressSummary.error}
+                          progressCanRun={progressSummary.canRun}
+                          progressAvailableCount={
+                            progressSummary.availableCount
+                          }
+                          onGenerateProgress={(force) => {
+                            void progressSummary.generate(force)
+                          }}
+                          onCancelProgress={progressSummary.cancel}
+                          onListenProgress={() => {
+                            if (!progressSummary.progressText.trim()) return
+                            setListenOverride(progressSummary.progressText)
+                            setListenSummaryNonce((n) => n + 1)
+                          }}
+                          onSelectChapter={(index) => {
+                            if (showDemo) return
+                            selectChapter(index)
+                          }}
+                          mapEntries={summaryMapEntries}
+                          splitConfidence={
+                            showDemo
+                              ? 'high'
+                              : book
+                                ? (book.splitConfidence ??
+                                  assessSplitConfidence({
+                                    format: book.format,
+                                    chapters: book.chapters,
+                                    usedPageChunks:
+                                      book.format === 'pdf' &&
+                                      book.chapters.length > 1 &&
+                                      book.chapters.every(
+                                        (c) =>
+                                          !(
+                                            c.literaryChapter &&
+                                            c.literaryChapter > 0
+                                          ),
+                                      ),
+                                  }))
+                                : null
+                          }
+                          bookFormat={
+                            showDemo ? 'txt' : (book?.format ?? null)
+                          }
+                          canEditSplits={Boolean(book && !showDemo)}
+                          onEditSplits={() => {
+                            setShowAiSplit(false)
+                            setShowSplitEditor(true)
+                          }}
+                          suggestAiSplit={
+                            Boolean(book && !showDemo && needsAiSplit(book))
+                          }
+                          onAiSplit={
+                            book && !showDemo && canOfferAiSplit(book)
+                              ? () => {
+                                  setShowSplitEditor(false)
+                                  setShowAiSplit(true)
+                                }
+                              : undefined
+                          }
+                          onDownloadMarkdown={() => {
+                            downloadBookSummariesMarkdown({
+                              bookTitle: showDemo
+                                ? SAMPLE_CHAPTER.title
+                                : (book?.title ?? 'Libro'),
+                              entries: summaryMapEntries,
+                            })
+                          }}
+                          queueProgress={summaryQueue.progress}
+                          queueRunning={summaryQueue.running}
+                          onCancelQueue={summaryQueue.cancel}
+                          onStartQueue={({ skipExisting }) => {
+                            const bookId = showDemo
+                              ? 'demo'
+                              : (book?.id ?? null)
+                            if (!bookId) return
+                            const chapters = summaryChapterOptions.map((c) => ({
+                              index: c.index,
+                              title: c.title,
+                              text: summaryChapterTexts[c.index] ?? '',
+                            }))
+                            void summaryQueue
+                              .start({
+                                bookId,
+                                chapters,
+                                skipExisting,
+                                onProgress: (p) => {
+                                  if (p.done > 0) {
+                                    setSummaryIndexTick((n) => n + 1)
+                                  }
+                                  if (
+                                    !showDemo &&
+                                    p.currentIndex != null &&
+                                    p.status === 'running'
+                                  ) {
+                                    selectChapter(p.currentIndex)
+                                  }
+                                },
+                              })
+                              .then(() => {
+                                setSummaryIndexTick((n) => n + 1)
+                              })
+                          }}
+                        />
+                      )}
+                    </>
                   )}
                   <AudioPlayer
                     adaptedText={result.adaptedText}
                     originalText={result.originalText}
+                    summaryText={
+                      listenOverride ?? chapterSummary.summaryText
+                    }
                     chapterKey={`${book?.id ?? 'demo'}:${chapterIndex}`}
                     currentLabel={currentChapterLabel}
                     hasNextChapter={hasNextChapter}
@@ -470,6 +830,25 @@ export default function App() {
                       showDemo ? undefined : saveSentenceProgress
                     }
                     seekNonce={seekNonce}
+                    listenSummaryNonce={listenSummaryNonce}
+                    summaryStatus={
+                      listenOverride ? 'ready' : chapterSummary.status
+                    }
+                    onSummaryHeard={() => {
+                      if (listenOverride) return
+                      const id = showDemo ? 'demo' : book?.id
+                      if (!id) return
+                      markSummaryHeard(id, showDemo ? 0 : chapterIndex)
+                      setHeardTick((n) => n + 1)
+                    }}
+                    onGenerateSummaryForChain={() => {
+                      if (listenOverride) return
+                      if (!chapterSummary.canRun) return
+                      if (chapterSummary.status === 'loading') return
+                      void chapterSummary.generate(false).then(() => {
+                        setSummaryIndexTick((n) => n + 1)
+                      })
+                    }}
                   />
                 </>
               )}
@@ -492,6 +871,19 @@ export default function App() {
                   />
                 ) : tab === 'review' ? (
                   <GlossaryQuiz items={reviewItems} />
+                ) : tab === 'ai' ? (
+                  chapterSummary.summaryText ? (
+                    <div className="chapter-summary-read">
+                      {chapterSummary.summaryText.split(/\n+/).map((p, i) => (
+                        <p key={i}>{p}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">
+                      Generá el resumen arriba para verlo y escucharlo con el
+                      botón «Resumen IA».
+                    </p>
+                  )
                 ) : (
                   <HighlightedText
                     result={result}
@@ -507,8 +899,7 @@ export default function App() {
 
       <footer className="foot">
         <p>
-          Conservador por defecto. {MAX_LIBRARY_SLOTS} libros abiertos · glosario
-          archivado sin tope · {APP_VERSION_LABEL}
+          {MAX_LIBRARY_SLOTS} libros · glosario archivado · {APP_VERSION_LABEL}
         </p>
         <p className="foot-version" title="Versión de esta build">
           Lectura Fiel {APP_VERSION_LABEL}

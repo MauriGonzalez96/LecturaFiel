@@ -1,4 +1,5 @@
 import { attachBookIdentity } from '../library/bookId'
+import { assessSplitConfidence } from './splitConfidence'
 import type { IngestedBook, ParsedBook } from './types'
 import { detectFormat } from './textCleanup'
 import { parsePlainText } from './parseTxt'
@@ -32,6 +33,13 @@ export async function ingestFile(file: File): Promise<IngestedBook> {
       throw new Error(
         'Formato no soportado. Usá PDF, EPUB, TXT o Markdown (.md).',
       )
+  }
+
+  if (!book.splitConfidence) {
+    book.splitConfidence = assessSplitConfidence({
+      format: book.format,
+      chapters: book.chapters,
+    })
   }
 
   return attachBookIdentity(book, file)

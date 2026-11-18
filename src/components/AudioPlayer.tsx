@@ -7,6 +7,8 @@ import { SpeechRateControl } from './SpeechRateControl'
 interface Props {
   adaptedText: string
   originalText: string
+  /** Resumen IA del capítulo (si existe). */
+  summaryText?: string
   /** Cambia al pasar de página/capítulo (dispara auto-continuación). */
   chapterKey?: string | number
   /** Etiqueta del capítulo/página actual (para el aviso). */
@@ -24,12 +26,27 @@ interface Props {
   onSentenceProgress?: (sentenceIndex: number) => void
   /** Incrementa al colocar el cursor a mano → si hay audio, salta ahí. */
   seekNonce?: number
+  /** Incrementa para forzar reproducción del resumen IA. */
+  listenSummaryNonce?: number
+  /**
+   * Estado del resumen del capítulo actual (para encadenar sin hablar
+   * el resumen viejo mientras carga el nuevo).
+   */
+  summaryStatus?: 'idle' | 'loading' | 'ready' | 'error' | 'unconfigured'
+  /** Se llama al terminar de escuchar un resumen. */
+  onSummaryHeard?: () => void
+  /**
+   * En cadena: si el capítulo nuevo no tiene resumen, pedí generarlo.
+   * El player espera `summaryStatus === 'loading' → ready`.
+   */
+  onGenerateSummaryForChain?: () => void
 }
 
-type Source = 'adapted' | 'original'
+type Source = 'adapted' | 'original' | 'summary'
 type PromptKind = 'next' | 'finished' | null
 
 const PROMPT_KEY = 'lectura-fiel:ask-continue'
+const CHAIN_KEY = 'lectura-fiel:chain-summaries'
 
 function readAskContinue(): boolean {
   try {
@@ -41,9 +58,18 @@ function readAskContinue(): boolean {
   }
 }
 
+function readChainSummaries(): boolean {
+  try {
+    return localStorage.getItem(CHAIN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function AudioPlayer({
   adaptedText,
   originalText,
+  summaryText = '',
   chapterKey,
   currentLabel,
   hasNextChapter = false,
@@ -53,36 +79,69 @@ export function AudioPlayer({
   resumeSentenceIndex = 0,
   onSentenceProgress,
   seekNonce = 0,
+  listenSummaryNonce = 0,
+  summaryStatus = 'idle',
+  onSummaryHeard,
+  onGenerateSummaryForChain,
 }: Props) {
   const { status, speak, stop, pause, resume } = useSpeech()
   const { rate, setRate } = useSpeechRate()
   const [askContinue, setAskContinue] = useState(readAskContinue)
+  const [chainSummaries, setChainSummaries] = useState(readChainSummaries)
   const [source, setSource] = useState<Source>('adapted')
   const [prompt, setPrompt] = useState<PromptKind>(null)
   const continueRef = useRef(false)
+  const pendingSummaryChainRef = useRef(false)
   const prevChapterRef = useRef(chapterKey)
   const lastSentenceRef = useRef(resumeSentenceIndex)
   const titleId = useId()
 
   const askRef = useRef(askContinue)
+  const chainRef = useRef(chainSummaries)
   const hasNextRef = useRef(hasNextChapter)
   const advanceFnRef = useRef(onAdvanceChapter)
   const adaptedRef = useRef(adaptedText)
   const originalRef = useRef(originalText)
+  const summaryRef = useRef(summaryText)
+  const summaryStatusRef = useRef(summaryStatus)
   const sourceRef = useRef(source)
   const speakRef = useRef(speak)
   const progressRef = useRef(onSentenceProgress)
   const resumeIdxRef = useRef(resumeSentenceIndex)
+  const heardRef = useRef(onSummaryHeard)
+  const generateChainRef = useRef(onGenerateSummaryForChain)
+  const generateRequestedForRef = useRef<string | number | null>(null)
 
   askRef.current = askContinue
+  chainRef.current = chainSummaries
   hasNextRef.current = hasNextChapter
   advanceFnRef.current = onAdvanceChapter
   adaptedRef.current = adaptedText
   originalRef.current = originalText
+  summaryRef.current = summaryText
+  summaryStatusRef.current = summaryStatus
   sourceRef.current = source
   speakRef.current = speak
   progressRef.current = onSentenceProgress
   resumeIdxRef.current = resumeSentenceIndex
+  heardRef.current = onSummaryHeard
+  generateChainRef.current = onGenerateSummaryForChain
+
+  useEffect(() => {
+    if (source === 'summary' && !summaryText.trim()) {
+      setSource('adapted')
+    }
+  }, [summaryText, source])
+
+  const prevListenSummaryRef = useRef(listenSummaryNonce)
+  useEffect(() => {
+    if (listenSummaryNonce === prevListenSummaryRef.current) return
+    prevListenSummaryRef.current = listenSummaryNonce
+    if (listenSummaryNonce === 0 || !summaryText.trim()) return
+    play('summary', true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listenSummaryNonce, summaryText])
+
   lastSentenceRef.current = resumeSentenceIndex
 
   useEffect(() => {
@@ -93,6 +152,20 @@ export function AudioPlayer({
     }
   }, [askContinue])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAIN_KEY, chainSummaries ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }, [chainSummaries])
+
+  function textFor(src: Source): string {
+    if (src === 'summary') return summaryRef.current
+    if (src === 'original') return originalRef.current
+    return adaptedRef.current
+  }
+
   function reportSentence(index: number) {
     lastSentenceRef.current = index
     progressRef.current?.(index)
@@ -100,6 +173,25 @@ export function AudioPlayer({
 
   function onPlaybackComplete() {
     reportSentence(0)
+    if (sourceRef.current === 'summary') {
+      heardRef.current?.()
+    }
+
+    // Encadenar resúmenes: avanzar y esperar el resumen del nuevo capítulo.
+    if (
+      sourceRef.current === 'summary' &&
+      chainRef.current &&
+      hasNextRef.current &&
+      advanceFnRef.current
+    ) {
+      pendingSummaryChainRef.current = true
+      continueRef.current = false
+      setPrompt(null)
+      const advanced = advanceFnRef.current()
+      if (!advanced) pendingSummaryChainRef.current = false
+      return
+    }
+
     if (!askRef.current) return
     if (hasNextRef.current && advanceFnRef.current) {
       setPrompt('next')
@@ -108,23 +200,79 @@ export function AudioPlayer({
     setPrompt('finished')
   }
 
-  // Tras confirmar y avanzar, seguir leyendo el texto nuevo desde el inicio.
+  // Tras confirmar y avanzar (texto adaptado/original), seguir leyendo.
   useEffect(() => {
     if (prevChapterRef.current === chapterKey) return
     prevChapterRef.current = chapterKey
+
+    // Cadena de resúmenes: no hablar hasta que cargue el del capítulo nuevo.
+    if (pendingSummaryChainRef.current) return
+
     if (!continueRef.current) return
+    if (sourceRef.current === 'summary') {
+      // Evitar reproducir el resumen anterior al cambiar de capítulo.
+      continueRef.current = false
+      return
+    }
     continueRef.current = false
-    const text =
-      sourceRef.current === 'adapted'
-        ? adaptedRef.current
-        : originalRef.current
+    const text = textFor(sourceRef.current)
     if (!text.trim()) return
     void speakRef.current(text, {
       startSentenceIndex: 0,
       onSentence: reportSentence,
       onComplete: onPlaybackComplete,
     })
-  }, [chapterKey, adaptedText, originalText])
+  }, [chapterKey, adaptedText, originalText, summaryText])
+
+  // Cuando llega el resumen del capítulo nuevo en una cadena.
+  useEffect(() => {
+    if (!pendingSummaryChainRef.current) return
+    if (!chainRef.current) return
+
+    if (summaryStatus === 'unconfigured') {
+      pendingSummaryChainRef.current = false
+      generateRequestedForRef.current = null
+      setPrompt('finished')
+      return
+    }
+
+    if (summaryStatus === 'loading') return
+
+    if (summaryText.trim()) {
+      pendingSummaryChainRef.current = false
+      generateRequestedForRef.current = null
+      setSource('summary')
+      void speakRef.current(summaryText, {
+        startSentenceIndex: 0,
+        onSentence: reportSentence,
+        onComplete: onPlaybackComplete,
+      })
+      return
+    }
+
+    // Sin resumen: pedir generación una vez por capítulo.
+    if (
+      summaryStatus === 'idle' &&
+      generateChainRef.current &&
+      generateRequestedForRef.current !== chapterKey
+    ) {
+      generateRequestedForRef.current = chapterKey ?? null
+      generateChainRef.current()
+      return
+    }
+
+    // Error o idle sin generador: saltar al siguiente o parar.
+    if (summaryStatus === 'error' || summaryStatus === 'idle' || summaryStatus === 'ready') {
+      generateRequestedForRef.current = null
+      if (hasNextRef.current && advanceFnRef.current) {
+        const advanced = advanceFnRef.current()
+        if (!advanced) pendingSummaryChainRef.current = false
+        return
+      }
+      pendingSummaryChainRef.current = false
+      setPrompt('finished')
+    }
+  }, [chapterKey, summaryText, summaryStatus])
 
   const prevSeekRef = useRef(seekNonce)
   useEffect(() => {
@@ -135,10 +283,7 @@ export function AudioPlayer({
     if (status !== 'speaking' && status !== 'paused' && status !== 'loading') {
       return
     }
-    const text =
-      sourceRef.current === 'adapted'
-        ? adaptedRef.current
-        : originalRef.current
+    const text = textFor(sourceRef.current)
     if (!text.trim()) return
     void speakRef.current(text, {
       startSentenceIndex: Math.max(0, resumeIdxRef.current),
@@ -172,7 +317,12 @@ export function AudioPlayer({
     setSource(next)
     continueRef.current = false
     setPrompt(null)
-    const text = next === 'adapted' ? adaptedText : originalText
+    const text =
+      next === 'summary'
+        ? summaryText
+        : next === 'original'
+          ? originalText
+          : adaptedText
     const startAt = fromStart ? 0 : Math.max(0, resumeIdxRef.current)
     void speak(text, {
       startSentenceIndex: startAt,
@@ -197,10 +347,18 @@ export function AudioPlayer({
     currentLabel?.trim() ||
     (hasNextChapter ? 'este capítulo' : 'el último capítulo')
 
-  const sentenceCount = splitSentences(
-    source === 'adapted' ? adaptedText : originalText,
-  ).length
-  const canResume = resumeSentenceIndex > 0 && resumeSentenceIndex < sentenceCount
+  const activeText =
+    source === 'summary'
+      ? summaryText
+      : source === 'original'
+        ? originalText
+        : adaptedText
+  const sentenceCount = splitSentences(activeText).length
+  const canResume =
+    source !== 'summary' &&
+    resumeSentenceIndex > 0 &&
+    resumeSentenceIndex < sentenceCount
+  const hasSummary = Boolean(summaryText.trim())
 
   return (
     <>
@@ -231,14 +389,14 @@ export function AudioPlayer({
             <button
               type="button"
               className="icon-btn primary"
-              onClick={() => play('adapted', false)}
-              disabled={!adaptedText.trim()}
+              onClick={() => play(hasSummary && source === 'summary' ? 'summary' : 'adapted', false)}
+              disabled={!adaptedText.trim() && !hasSummary}
               title={
                 canResume
                   ? `Continuar desde la oración ${resumeSentenceIndex + 1}`
-                  : 'Reproducir texto adaptado'
+                  : 'Reproducir'
               }
-              aria-label="Reproducir adaptado"
+              aria-label="Reproducir"
             >
               <IconPlay />
             </button>
@@ -257,7 +415,7 @@ export function AudioPlayer({
 
           <button
             type="button"
-            className="btn ghost audio-src"
+            className={`btn ghost audio-src${source === 'adapted' ? ' active' : ''}`}
             onClick={() => play('adapted', false)}
             disabled={!adaptedText.trim() || status === 'loading'}
             title="Escuchar versión adaptada"
@@ -266,12 +424,25 @@ export function AudioPlayer({
           </button>
           <button
             type="button"
-            className="btn ghost audio-src"
+            className={`btn ghost audio-src${source === 'original' ? ' active' : ''}`}
             onClick={() => play('original', false)}
             disabled={!originalText.trim() || status === 'loading'}
             title="Escuchar original"
           >
             Original
+          </button>
+          <button
+            type="button"
+            className={`btn ghost audio-src${source === 'summary' ? ' active' : ''}`}
+            onClick={() => play('summary', true)}
+            disabled={!hasSummary || status === 'loading'}
+            title={
+              hasSummary
+                ? 'Escuchar resumen IA (idea fundamental)'
+                : 'Generá un resumen IA del capítulo primero'
+            }
+          >
+            Resumen IA
           </button>
           {canResume && status === 'idle' && (
             <button
@@ -306,6 +477,19 @@ export function AudioPlayer({
             />
             Avisar al terminar
           </label>
+          {hasSummary && (
+            <label
+              className="audio-advance"
+              title="Al terminar un resumen IA, pasar al siguiente capítulo y escucharlo"
+            >
+              <input
+                type="checkbox"
+                checked={chainSummaries}
+                onChange={(e) => setChainSummaries(e.target.checked)}
+              />
+              Encadenar resúmenes
+            </label>
+          )}
         </div>
 
         <SpeechRateControl
