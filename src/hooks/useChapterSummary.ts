@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { aiConfigured, loadAiConfig } from '../ai/config'
-import { textHash } from '../ai/hash'
-import { summarizeChapter } from '../ai/summarizeChapter'
+import {
+  chapterSummaryCacheKey,
+  summarizeChapter,
+} from '../ai/summarizeChapter'
+import type { SummaryConcept } from '../ai/summaryConcepts'
 import { loadChapterSummary } from '../ai/summaryStorage'
 import type { ChapterSummary, SummaryStatus } from '../ai/types'
 
@@ -10,6 +13,8 @@ export function useChapterSummary(opts: {
   chapterIndex: number
   title: string
   text: string
+  /** Conceptos del pipeline (intercambios / glosario) del capítulo actual. */
+  concepts?: SummaryConcept[]
   /** Cambiar para releer config IA (tras guardar API key). */
   configTick?: number
   /** Cambiar para releer caché (p. ej. tras cola de resúmenes). */
@@ -19,8 +24,10 @@ export function useChapterSummary(opts: {
   const [status, setStatus] = useState<SummaryStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const conceptsRef = useRef(opts.concepts)
+  conceptsRef.current = opts.concepts
 
-  const hash = textHash(opts.text || '')
+  const hash = chapterSummaryCacheKey(opts.text || '')
   const canRun = Boolean(opts.bookId && opts.text.trim())
 
   useEffect(() => {
@@ -86,6 +93,7 @@ export function useChapterSummary(opts: {
           chapterIndex: opts.chapterIndex,
           title: opts.title || `Capítulo ${opts.chapterIndex + 1}`,
           text: opts.text,
+          concepts: conceptsRef.current,
           force,
           signal: ac.signal,
         })

@@ -82,6 +82,7 @@ describe('chatCompletion fallback de modelo', () => {
     // migrateAiModel convierte 2.0 → 3-flash-preview antes del primer intento
     expect(firstBody.model).toBe('gemini-3-flash-preview')
     expect(firstBody.reasoning_effort).toBe('minimal')
+    expect(firstBody.temperature).toBeUndefined()
     expect(secondBody.model).not.toBe(firstBody.model)
     expect(saveAiConfig).toHaveBeenCalled()
   })

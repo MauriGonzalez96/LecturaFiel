@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { textHash } from '../ai/hash'
+import { chapterSummaryCacheKey } from '../ai/summarizeChapter'
 import { listSummariesForBook } from '../ai/summaryStorage'
 
 /**
@@ -13,7 +13,7 @@ export function useBookSummaryIndex(
 ): Set<number> {
   const [ready, setReady] = useState<Set<number>>(() => new Set())
   const fingerprint = useMemo(
-    () => chapterTexts.map((t) => textHash(t || '')).join('|'),
+    () => chapterTexts.map((t) => chapterSummaryCacheKey(t || '')).join('|'),
     [chapterTexts],
   )
 

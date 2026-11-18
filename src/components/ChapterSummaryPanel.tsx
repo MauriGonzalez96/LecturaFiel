@@ -134,7 +134,7 @@ export function ChapterSummaryPanel({
               </h3>
               <p className="chapter-summary-hint">
                 {tocView === 'mapa'
-                  ? 'Índice con la idea fundamental de cada capítulo ya resumido. Tocá uno para abrirlo.'
+                  ? 'Índice con la explicación detallada de cada capítulo ya generado. Tocá uno para abrirlo.'
                   : multi
                     ? `${chapters.length} secciones al subir el libro. Elegí una y generá el resumen, o resumí todos en cola.`
                     : 'Se detectó una sola sección. Si el archivo no trae encabezados de capítulo, el resumen cubre todo el texto cargado.'}
@@ -361,7 +361,7 @@ export function ChapterSummaryPanel({
                       ) : (
                         <p className="chapter-summary-map-excerpt muted">
                           {queueCurrent
-                            ? 'La IA está redactando la idea fundamental…'
+                            ? 'La IA está redactando la explicación detallada…'
                             : 'Sin resumen todavía.'}
                         </p>
                       )}
@@ -457,8 +457,9 @@ export function ChapterSummaryPanel({
               : ' del capítulo (IA)'}
           </h3>
           <p className="chapter-summary-hint">
-            Idea fundamental, sin rodeos ni ejemplos de más — pensado para
-            audiolibro.
+            Como alguien que leyó el capítulo con ganas: te cuenta la esencia,
+            introduce los conceptos del autor (también los que Lectura Fiel
+            intercambió) y explica en qué contexto los usa.
           </p>
         </div>
         <div className="chapter-summary-actions">

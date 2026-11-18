@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { textHash } from './hash'
 
 const listMock = vi.fn()
 
@@ -50,7 +49,8 @@ describe('exportBookSummaries', () => {
 
   it('marca ready solo si el hash coincide', async () => {
     const text = 'Texto actual del capítulo uno.'
-    const hash = textHash(text.replace(/\s+/g, ' ').trim())
+    const { chapterSummaryCacheKey } = await import('./summarizeChapter')
+    const hash = chapterSummaryCacheKey(text)
     listMock.mockResolvedValue([
       {
         bookId: 'b1',

@@ -76,7 +76,9 @@ describe('summarizeChapter (mock Gemini)', () => {
 
     expect(result.summary).toMatch(/planificación|libertad|autoritarismo/i)
     expect(result.model).toBe('gemini-3-flash-preview')
-    expect(result.textHash).toBe(textHash(sample))
+    expect(result.textHash).toBe(
+      textHash(`esencia-conceptos-v3\n${sample}`),
+    )
     expect(fetch).toHaveBeenCalled()
     const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]
     expect(String(url)).toContain(
@@ -85,6 +87,34 @@ describe('summarizeChapter (mock Gemini)', () => {
     expect((init as RequestInit).headers).toMatchObject({
       Authorization: 'Bearer AIza-test-fake-key',
     })
+  })
+
+  it('incluye conceptos intercambiados en el prompt', async () => {
+    await summarizeChapter({
+      bookId: 'test-book',
+      chapterIndex: 2,
+      title: 'Capítulo conceptos',
+      text: sample,
+      force: true,
+      concepts: [
+        {
+          term: 'servidumbre',
+          plain: 'esclavitud',
+          definition: 'Dependencia forzada.',
+          context: 'El camino de servidumbre comienza así.',
+        },
+      ],
+    })
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!
+    const body = JSON.parse(String((init as RequestInit).body)) as {
+      messages: { role: string; content: string }[]
+    }
+    const user = body.messages.find((m) => m.role === 'user')?.content ?? ''
+    expect(user).toMatch(/servidumbre/)
+    expect(user).toMatch(/esclavitud/)
+    expect(user).toMatch(/Dependencia forzada/)
+    expect(user).toMatch(/Integrálos|conceptos difíciles/i)
   })
 
   it('reusa caché si no se fuerza', async () => {

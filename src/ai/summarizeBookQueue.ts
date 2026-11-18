@@ -1,5 +1,7 @@
-import { textHash } from './hash'
-import { summarizeChapter } from './summarizeChapter'
+import {
+  chapterSummaryCacheKey,
+  summarizeChapter,
+} from './summarizeChapter'
 import { loadChapterSummary } from './summaryStorage'
 
 export type QueueChapterInput = {
@@ -95,7 +97,7 @@ export async function summarizeBookQueue(opts: {
     emit()
 
     const text = ch.text.replace(/\s+/g, ' ').trim()
-    const hash = textHash(text)
+    const hash = chapterSummaryCacheKey(text)
 
     try {
       if (skipExisting && !force) {

@@ -36,7 +36,6 @@ vi.mock('./summaryStorage', () => ({
   },
 }))
 
-import { textHash } from './hash'
 import { summarizeBookQueue } from './summarizeBookQueue'
 
 describe('summarizeBookQueue', () => {
@@ -77,7 +76,8 @@ describe('summarizeBookQueue', () => {
 
   it('salta capítulos con resumen en caché', async () => {
     const text = 'Capítulo ya resumido con suficiente texto.'
-    const hash = textHash(text.replace(/\s+/g, ' ').trim())
+    const { chapterSummaryCacheKey } = await import('./summarizeChapter')
+    const hash = chapterSummaryCacheKey(text)
     memory.set('book-b:0:' + hash, {
       bookId: 'book-b',
       chapterIndex: 0,

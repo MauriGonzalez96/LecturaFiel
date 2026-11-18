@@ -37,6 +37,7 @@ import { useInterventionMode } from './hooks/useInterventionMode'
 import { useUserEveryday } from './hooks/useUserEveryday'
 import { useVoiceSettings } from './hooks/useVoiceSettings'
 import { useChapterSummary } from './hooks/useChapterSummary'
+import { conceptsFromPipeline } from './ai/summaryConcepts'
 import { useBookSummaryIndex } from './hooks/useBookSummaryIndex'
 import { useBookSummaryMap } from './hooks/useBookSummaryMap'
 import { useBookSummaryQueue } from './hooks/useBookSummaryQueue'
@@ -109,6 +110,11 @@ export default function App() {
     pipelineBust,
   )
 
+  const summaryConcepts = useMemo(
+    () => conceptsFromPipeline(result),
+    [result],
+  )
+
   const chapterSummary = useChapterSummary({
     bookId: showDemo ? 'demo' : (book?.id ?? null),
     chapterIndex: showDemo ? 0 : chapterIndex,
@@ -116,6 +122,7 @@ export default function App() {
       (showDemo ? SAMPLE_CHAPTER.title : chapterMeta?.title) ||
       `Capítulo ${chapter}`,
     text,
+    concepts: summaryConcepts,
     configTick: aiConfigTick,
     refreshTick: summaryIndexTick,
   })

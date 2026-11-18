@@ -31,7 +31,9 @@ export function SummaryReadView({
     <div className="chapter-summary-read">
       {chapterLabel ? (
         <header className="chapter-summary-read-head">
-          <span className="chapter-summary-read-kicker">Resumen IA</span>
+          <span className="chapter-summary-read-kicker">
+            Explicación detallada
+          </span>
           <h3>{chapterLabel}</h3>
         </header>
       ) : null}

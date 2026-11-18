@@ -7,14 +7,16 @@ import {
 } from './summaryStorage'
 import type { ChapterSummary, ProgressSummary } from './types'
 
-const MAX_OUTPUT_TOKENS = 1400
+const MAX_OUTPUT_TOKENS = 2800
+const PROMPT_VERSION = 'progreso-detallado-v1'
 
-const SYSTEM_PROMPT = `Sos un editor de audiolibros en español. Te pasan resúmenes de capítulos ya hechos.
-Redactá un «resumen hasta aquí» del arco del libro: qué se estableció, cómo avanzó el argumento y dónde queda el lector.
+const SYSTEM_PROMPT = `Sos un editor de audiolibros en español. Te pasan explicaciones detalladas de capítulos ya hechas.
+Redactá un «hasta aquí» del arco del libro: qué se estableció, cómo avanzó el argumento y dónde queda el lector.
 Reglas:
-- No inventes capítulos que no estén en los resúmenes.
+- No inventes capítulos que no estén en los textos dados.
+- Conservá matices importantes; no reduzcas todo a una slogan.
 - Español claro, párrafos cortos, apto para voz alta.
-- 1–3 minutos de lectura en voz (aprox. 180–450 palabras).
+- Longitud: aprox. 3–6 minutos de lectura en voz (unas 450–900 palabras), según lo rico que sea el material.
 - Sin listas interminables ni spoilers de lo que no vino aún.
 - Sin markdown, sin títulos con **, sin viñetas: solo prosa.`
 
@@ -46,7 +48,8 @@ export async function summarizeProgressSoFar(opts: {
   }
 
   const hash = textHash(
-    ordered.map((s) => `${s.chapterIndex}:${s.summary}`).join('\n---\n'),
+    `${PROMPT_VERSION}\n` +
+      ordered.map((s) => `${s.chapterIndex}:${s.summary}`).join('\n---\n'),
   )
 
   if (!opts.force) {

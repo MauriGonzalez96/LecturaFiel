@@ -3,7 +3,7 @@ import {
   buildBookSummaryMap,
   type BookSummaryMapEntry,
 } from '../ai/exportBookSummaries'
-import { textHash } from '../ai/hash'
+import { chapterSummaryCacheKey } from '../ai/summarizeChapter'
 
 /**
  * Mapa capítulo → resumen (excerpt) para la vista Índice / export.
@@ -19,7 +19,7 @@ export function useBookSummaryMap(
       chapters
         .map(
           (c) =>
-            `${c.index}:${textHash((c.text || '').replace(/\s+/g, ' ').trim())}`,
+            `${c.index}:${chapterSummaryCacheKey(c.text || '')}`,
         )
         .join('|'),
     [chapters],

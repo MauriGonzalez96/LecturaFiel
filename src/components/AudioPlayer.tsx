@@ -537,8 +537,8 @@ export function AudioPlayer({
             disabled={!hasSummary || status === 'loading'}
             title={
               hasSummary
-                ? 'Escuchar resumen IA (idea fundamental)'
-                : 'Generá un resumen IA del capítulo primero'
+                ? 'Escuchar explicación detallada (Resumen IA)'
+                : 'Generá la explicación detallada del capítulo primero'
             }
           >
             Resumen IA

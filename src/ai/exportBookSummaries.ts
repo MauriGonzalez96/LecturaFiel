@@ -1,4 +1,4 @@
-import { textHash } from './hash'
+import { chapterSummaryCacheKey } from './summarizeChapter'
 import { listSummariesForBook } from './summaryStorage'
 import type { ChapterSummary } from './types'
 
@@ -33,7 +33,7 @@ export async function buildBookSummaryMap(
   }
 
   return chapters.map((ch) => {
-    const hash = textHash((ch.text || '').replace(/\s+/g, ' ').trim())
+    const hash = chapterSummaryCacheKey(ch.text || '')
     const hit = byIndex.get(ch.index)
     const ready = Boolean(hit && hit.textHash === hash && hit.summary.trim())
     const summary = ready ? hit!.summary.trim() : null
@@ -61,7 +61,7 @@ export function buildBookSummariesMarkdown(opts: {
   const lines: string[] = [
     `# ${opts.bookTitle.trim() || 'Libro'}`,
     '',
-    `> Resúmenes de idea fundamental · Lectura Fiel`,
+    `> Explicaciones detalladas · Lectura Fiel`,
     '',
   ]
 
