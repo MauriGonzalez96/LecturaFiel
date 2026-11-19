@@ -78,7 +78,7 @@ export function openGlossaryWindow(opts: {
   const title =
     opts.mode === 'book'
       ? `Glosario · ${opts.bookTitle || 'Este libro'}`
-      : 'Glosario general · Lectura Fiel'
+      : 'Glosario general · Lektor'
 
   let body = `<h1>${escapeHtml(title)}</h1>`
 
@@ -108,7 +108,7 @@ export function openGlossaryWindow(opts: {
 
   const features =
     'popup=yes,width=540,height=760,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
-  const win = window.open('', 'lectura-fiel-glossary', features)
+  const win = window.open('', 'lektor-glossary', features)
   if (!win) return false
 
   win.document.open()

@@ -42,6 +42,8 @@ interface Props {
   onGenerateSummaryForChain?: () => void
   /** Avisa qué se está leyendo (para resaltar texto y cambiar de pestaña). */
   onNowPlaying?: (info: NowPlayingInfo | null) => void
+  /** Barra fija inferior (estilo Spotify). */
+  variant?: 'default' | 'dock'
 }
 
 export type AudioSource = 'adapted' | 'original' | 'summary'
@@ -63,8 +65,8 @@ const SOURCE_LABEL: Record<Source, string> = {
   summary: 'Resumen IA',
 }
 
-const PROMPT_KEY = 'lectura-fiel:ask-continue'
-const CHAIN_KEY = 'lectura-fiel:chain-summaries'
+const PROMPT_KEY = 'lektor:ask-continue'
+const CHAIN_KEY = 'lektor:chain-summaries'
 
 function readAskContinue(): boolean {
   try {
@@ -102,7 +104,9 @@ export function AudioPlayer({
   onSummaryHeard,
   onGenerateSummaryForChain,
   onNowPlaying,
+  variant = 'default',
 }: Props) {
+  const dock = variant === 'dock'
   const { status, speak, stop, pause, resume } = useSpeech()
   const { rate, setRate } = useSpeechRate()
   const [askContinue, setAskContinue] = useState(readAskContinue)
@@ -416,27 +420,27 @@ export function AudioPlayer({
     )
   }
 
-  return (
-    <>
-      <div className="audio-now" aria-live="polite">
-        <div className="audio-now-meta">
-          <strong>{SOURCE_LABEL[source]}</strong>
-          <span aria-hidden="true">·</span>
-          <span>{chapterLabel}</span>
-          {(status === 'speaking' ||
-            status === 'paused' ||
-            status === 'loading') &&
-            sentenceCount > 0 && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>
-                  oración {Math.min(spokenIndex + 1, sentenceCount)}/
-                  {sentenceCount}
-                </span>
-              </>
-            )}
-        </div>
+  const nowBlock = (
+    <div className="audio-now" aria-live="polite">
+      <div className="audio-now-meta">
+        <strong>{SOURCE_LABEL[source]}</strong>
+        <span aria-hidden="true">·</span>
+        <span>{chapterLabel}</span>
         {(status === 'speaking' ||
+          status === 'paused' ||
+          status === 'loading') &&
+          sentenceCount > 0 && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                oración {Math.min(spokenIndex + 1, sentenceCount)}/
+                {sentenceCount}
+              </span>
+            </>
+          )}
+      </div>
+      {!dock &&
+        (status === 'speaking' ||
           status === 'paused' ||
           status === 'loading') && (
           <p className="audio-now-line">
@@ -447,124 +451,132 @@ export function AudioPlayer({
                 : 'Leyendo…'}
           </p>
         )}
-        {status === 'idle' && !hasSummary && source !== 'summary' && (
-          <p className="audio-now-hint muted">
-            Estás en el texto {SOURCE_LABEL[source].toLowerCase()}. Generá un
-            resumen IA del capítulo para verlo y escucharlo acá.
-          </p>
-        )}
-        {status === 'idle' && hasSummary && source !== 'summary' && (
-          <p className="audio-now-hint muted">
-            Resumen listo para «{chapterLabel}». Usá el botón «Resumen IA» o
-            abrí la pestaña Resumen IA.
-          </p>
-        )}
-      </div>
+      {!dock && status === 'idle' && !hasSummary && source !== 'summary' && (
+        <p className="audio-now-hint muted">
+          Estás en el texto {SOURCE_LABEL[source].toLowerCase()}. Generá un
+          resumen IA del capítulo para verlo y escucharlo acá.
+        </p>
+      )}
+      {!dock && status === 'idle' && hasSummary && source !== 'summary' && (
+        <p className="audio-now-hint muted">
+          Resumen listo para «{chapterLabel}». Usá el botón «Resumen IA» o
+          abrí la pestaña Resumen IA.
+        </p>
+      )}
+    </div>
+  )
 
-      <div className="audio-bar" role="group" aria-label="Reproducir audio">
-        <div className="audio-controls">
-          {status === 'paused' ? (
-            <button
-              type="button"
-              className="icon-btn primary"
-              onClick={resume}
-              title="Reanudar"
-              aria-label="Reanudar"
-            >
-              <IconPlay />
-            </button>
-          ) : status === 'speaking' || status === 'loading' ? (
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={handlePause}
-              title="Pausa"
-              aria-label="Pausa"
-              disabled={status === 'loading'}
-            >
-              <IconPause />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="icon-btn primary"
-              onClick={() => play(hasSummary && source === 'summary' ? 'summary' : 'adapted', false)}
-              disabled={!adaptedText.trim() && !hasSummary}
-              title={
-                canResume
-                  ? `Continuar desde la oración ${resumeSentenceIndex + 1}`
-                  : 'Reproducir'
-              }
-              aria-label="Reproducir"
-            >
-              <IconPlay />
-            </button>
-          )}
-
+  const transport = (
+    <div className="audio-bar" role="group" aria-label="Reproducir audio">
+      <div className="audio-controls">
+        {status === 'paused' ? (
+          <button
+            type="button"
+            className="icon-btn primary"
+            onClick={resume}
+            title="Reanudar"
+            aria-label="Reanudar"
+          >
+            <IconPlay />
+          </button>
+        ) : status === 'speaking' || status === 'loading' ? (
           <button
             type="button"
             className="icon-btn"
-            onClick={handleStop}
-            disabled={status === 'idle' && !prompt}
-            title="Detener"
-            aria-label="Detener"
+            onClick={handlePause}
+            title="Pausa"
+            aria-label="Pausa"
+            disabled={status === 'loading'}
           >
-            <IconStop />
+            <IconPause />
           </button>
-
+        ) : (
           <button
             type="button"
-            className={`btn ghost audio-src${source === 'adapted' ? ' active' : ''}`}
-            onClick={() => play('adapted', false)}
-            disabled={!adaptedText.trim() || status === 'loading'}
-            title="Escuchar versión adaptada"
-          >
-            Adaptado
-          </button>
-          <button
-            type="button"
-            className={`btn ghost audio-src${source === 'original' ? ' active' : ''}`}
-            onClick={() => play('original', false)}
-            disabled={!originalText.trim() || status === 'loading'}
-            title="Escuchar original"
-          >
-            Original
-          </button>
-          <button
-            type="button"
-            className={`btn ghost audio-src${source === 'summary' ? ' active' : ''}`}
-            onClick={() => play('summary', true)}
-            disabled={!hasSummary || status === 'loading'}
-            title={
-              hasSummary
-                ? 'Escuchar explicación detallada (Resumen IA)'
-                : 'Generá la explicación detallada del capítulo primero'
+            className="icon-btn primary"
+            onClick={() =>
+              play(
+                hasSummary && source === 'summary' ? 'summary' : 'adapted',
+                false,
+              )
             }
+            disabled={!adaptedText.trim() && !hasSummary}
+            title={
+              canResume
+                ? `Continuar desde la oración ${resumeSentenceIndex + 1}`
+                : 'Reproducir'
+            }
+            aria-label="Reproducir"
           >
-            Resumen IA
+            <IconPlay />
           </button>
-          {canResume && status === 'idle' && (
-            <button
-              type="button"
-              className="btn ghost audio-src"
-              onClick={() => play(source, true)}
-              title="Empezar el capítulo desde la primera oración"
-            >
-              Desde el inicio
-            </button>
-          )}
+        )}
 
-          {onOpenVoices && (
-            <button
-              type="button"
-              className="btn ghost audio-src"
-              onClick={onOpenVoices}
-              title="Elegir y probar voces"
-            >
-              Voces…
-            </button>
-          )}
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={handleStop}
+          disabled={status === 'idle' && !prompt}
+          title="Detener"
+          aria-label="Detener"
+        >
+          <IconStop />
+        </button>
 
+        <button
+          type="button"
+          className={`btn ghost audio-src${source === 'adapted' ? ' active' : ''}`}
+          onClick={() => play('adapted', false)}
+          disabled={!adaptedText.trim() || status === 'loading'}
+          title="Escuchar versión adaptada"
+        >
+          Adaptado
+        </button>
+        <button
+          type="button"
+          className={`btn ghost audio-src${source === 'original' ? ' active' : ''}`}
+          onClick={() => play('original', false)}
+          disabled={!originalText.trim() || status === 'loading'}
+          title="Escuchar original"
+        >
+          Original
+        </button>
+        <button
+          type="button"
+          className={`btn ghost audio-src${source === 'summary' ? ' active' : ''}`}
+          onClick={() => play('summary', true)}
+          disabled={!hasSummary || status === 'loading'}
+          title={
+            hasSummary
+              ? 'Escuchar explicación detallada (Resumen IA)'
+              : 'Generá la explicación detallada del capítulo primero'
+          }
+        >
+          Resumen IA
+        </button>
+        {canResume && status === 'idle' && (
+          <button
+            type="button"
+            className="btn ghost audio-src"
+            onClick={() => play(source, true)}
+            title="Empezar el capítulo desde la primera oración"
+          >
+            Desde el inicio
+          </button>
+        )}
+
+        {onOpenVoices && !dock && (
+          <button
+            type="button"
+            className="btn ghost audio-src"
+            onClick={onOpenVoices}
+            title="Elegir y probar voces"
+          >
+            Voces…
+          </button>
+        )}
+
+        {!dock && (
           <label
             className="audio-advance"
             title="Al terminar el audio, avisar y preguntar si seguimos"
@@ -576,28 +588,32 @@ export function AudioPlayer({
             />
             Avisar al terminar
           </label>
-          {hasSummary && (
-            <label
-              className="audio-advance"
-              title="Al terminar un resumen IA, pasar al siguiente capítulo y escucharlo"
-            >
-              <input
-                type="checkbox"
-                checked={chainSummaries}
-                onChange={(e) => setChainSummaries(e.target.checked)}
-              />
-              Encadenar resúmenes
-            </label>
-          )}
-        </div>
+        )}
+        {!dock && hasSummary && (
+          <label
+            className="audio-advance"
+            title="Al terminar un resumen IA, pasar al siguiente capítulo y escucharlo"
+          >
+            <input
+              type="checkbox"
+              checked={chainSummaries}
+              onChange={(e) => setChainSummaries(e.target.checked)}
+            />
+            Encadenar resúmenes
+          </label>
+        )}
+      </div>
 
+      {!dock && (
         <SpeechRateControl
           rate={rate}
           onChange={setRate}
           compact
           disabled={status === 'loading'}
         />
+      )}
 
+      {!dock && (
         <StatusDot
           status={status}
           sourceLabel={SOURCE_LABEL[source]}
@@ -605,7 +621,65 @@ export function AudioPlayer({
           sentenceIndex={spokenIndex}
           sentenceCount={sentenceCount}
         />
-      </div>
+      )}
+    </div>
+  )
+
+  return (
+    <>
+      {dock ? (
+        <div className="player-dock-inner">
+          {nowBlock}
+          {transport}
+          <div className="player-dock-meta">
+            <SpeechRateControl
+              rate={rate}
+              onChange={setRate}
+              compact
+              disabled={status === 'loading'}
+            />
+            {onOpenVoices && (
+              <button
+                type="button"
+                className="btn ghost audio-src"
+                onClick={onOpenVoices}
+                title="Elegir y probar voces"
+              >
+                Voces…
+              </button>
+            )}
+            <label
+              className="audio-advance"
+              title="Al terminar el audio, avisar y preguntar si seguimos"
+            >
+              <input
+                type="checkbox"
+                checked={askContinue}
+                onChange={(e) => setAskContinue(e.target.checked)}
+              />
+              Avisar
+            </label>
+            {hasSummary && (
+              <label
+                className="audio-advance"
+                title="Al terminar un resumen IA, pasar al siguiente capítulo y escucharlo"
+              >
+                <input
+                  type="checkbox"
+                  checked={chainSummaries}
+                  onChange={(e) => setChainSummaries(e.target.checked)}
+                />
+                Encadenar
+              </label>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {nowBlock}
+          {transport}
+        </>
+      )}
 
       {prompt === 'next' && (
         <div

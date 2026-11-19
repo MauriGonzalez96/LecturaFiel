@@ -1,7 +1,7 @@
 //! TTS vía Tauri: Neural (MS Edge) + Piper (CLI oficial + modelos HF).
 
 mod neural;
-mod paths;
+pub mod paths;
 mod piper;
 mod prefs;
 mod voices;
@@ -126,12 +126,34 @@ pub fn tts_speak(req: SpeakRequest) -> Result<serde_json::Value, String> {
                 other => return Err(format!("Fuente TTS desconocida: {other}")),
             };
             cleanup_old_audio(12);
-            Ok(serde_json::json!({
-                "path": path.to_string_lossy(),
-            }))
+            audio_payload(path)
         },
         "síntesis TTS",
     )
+}
+
+fn audio_payload(path: std::path::PathBuf) -> Result<serde_json::Value, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("No se pudo leer el audio: {e}"))?;
+    if bytes.is_empty() {
+        return Err("Audio vacío".into());
+    }
+    let mime = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| {
+            if ext.eq_ignore_ascii_case("wav") {
+                "audio/wav"
+            } else {
+                "audio/mpeg"
+            }
+        })
+        .unwrap_or("audio/mpeg");
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes);
+    Ok(serde_json::json!({
+        "path": path.to_string_lossy(),
+        "mime": mime,
+        "base64": b64,
+    }))
 }
 
 #[tauri::command]

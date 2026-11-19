@@ -8,6 +8,13 @@ import type {
 export const DEFAULT_SAMPLE =
   'En un lugar de la Mancha, de cuyo nombre no quiero acordarme, no ha mucho tiempo que vivía un hidalgo.'
 
+type SpeakResult = {
+  path?: string
+  base64?: string
+  mime?: string
+  error?: string
+}
+
 async function desktopKind(): Promise<'tauri' | 'other'> {
   try {
     const { getDesktopKind } = await import('../desktop/bridge')
@@ -22,9 +29,34 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
   return invoke<T>(cmd, args)
 }
 
-async function pathToAudioUrl(path: string): Promise<string> {
-  const { convertFileSrc } = await import('@tauri-apps/api/core')
-  return convertFileSrc(path)
+export function formatVoiceError(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message.trim()) return err.message
+  if (typeof err === 'string' && err.trim()) return err
+  if (err && typeof err === 'object') {
+    const msg = (err as { message?: unknown }).message
+    if (typeof msg === 'string' && msg.trim()) return msg
+  }
+  return fallback
+}
+
+function blobUrlFromBase64(base64: string, mime: string): string {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: mime }))
+}
+
+async function audioUrlFromSpeak(data: SpeakResult): Promise<string> {
+  if (data.base64) {
+    return blobUrlFromBase64(data.base64, data.mime || 'audio/mpeg')
+  }
+  if (data.path) {
+    const { convertFileSrc } = await import('@tauri-apps/api/core')
+    return convertFileSrc(data.path)
+  }
+  throw new Error(data.error || 'Error al generar audio')
 }
 
 export async function ttsApiAvailable(): Promise<boolean> {
@@ -159,14 +191,10 @@ export async function previewVoice(
   rate?: number,
 ): Promise<string> {
   if ((await desktopKind()) === 'tauri') {
-    const data = await tauriInvoke<{ path?: string; error?: string }>(
-      'tts_preview',
-      {
-        req: { source, voiceId, text, rate },
-      },
-    )
-    if (!data.path) throw new Error(data.error || 'Error al generar audio')
-    return pathToAudioUrl(data.path)
+    const data = await tauriInvoke<SpeakResult>('tts_preview', {
+      req: { source, voiceId, text, rate },
+    })
+    return audioUrlFromSpeak(data)
   }
   const r = await fetch('/api/voices/preview', {
     method: 'POST',
@@ -185,14 +213,10 @@ export async function speakRemote(
   rate?: number,
 ): Promise<string> {
   if ((await desktopKind()) === 'tauri') {
-    const data = await tauriInvoke<{ path?: string; error?: string }>(
-      'tts_speak',
-      {
-        req: { source, voiceId, text, rate },
-      },
-    )
-    if (!data.path) throw new Error(data.error || 'Error al generar audio')
-    return pathToAudioUrl(data.path)
+    const data = await tauriInvoke<SpeakResult>('tts_speak', {
+      req: { source, voiceId, text, rate },
+    })
+    return audioUrlFromSpeak(data)
   }
   const r = await fetch('/api/voices/speak', {
     method: 'POST',

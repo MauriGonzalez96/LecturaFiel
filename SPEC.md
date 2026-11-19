@@ -1,4 +1,4 @@
-# Lectura Fiel — especificación
+# Lektor — especificación
 
 ## Principio central
 

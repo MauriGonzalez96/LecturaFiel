@@ -3,7 +3,7 @@ import { saveVoicePrefs, ttsApiAvailable } from '../voices/api'
 import { clampSpeechRate, DEFAULT_SPEECH_RATE } from '../voices/rate'
 import type { VoicePrefs } from '../voices/types'
 
-const LOCAL_PREFS_KEY = 'lectura-fiel:voice-prefs'
+const LOCAL_PREFS_KEY = 'lektor:voice-prefs'
 
 function readRate(): number {
   try {

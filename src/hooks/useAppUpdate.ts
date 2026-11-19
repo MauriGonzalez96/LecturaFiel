@@ -15,6 +15,7 @@ export type UpdateUiStatus =
   | 'noReleases'
   | 'error'
   | 'downloading'
+  | 'installFailed'
 
 function readSkipped(): string | null {
   try {
@@ -108,17 +109,30 @@ export function useAppUpdate() {
     setPopupOpen(false)
   }, [release, status])
 
-  const acceptUpdate = useCallback(() => {
+  const acceptUpdate = useCallback(async () => {
     if (!release) return
     setStatus('downloading')
-    startUpdateDownload(release)
-    // Tras disparar la descarga, dejamos el popup con instrucciones
+    setError(null)
+    try {
+      await startUpdateDownload(release)
+      // En Tauri la app se cierra al lanzar el instalador.
+      // En web nos quedamos con instrucciones de descarga.
+    } catch (err) {
+      setStatus('installFailed')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo iniciar la actualización.',
+      )
+    }
   }, [release])
 
   const closePopup = useCallback(() => {
     setPopupOpen(false)
-    if (status === 'downloading') setStatus('available')
-  }, [status])
+    if (status === 'downloading' || status === 'installFailed') {
+      setStatus(release ? 'available' : 'idle')
+    }
+  }, [status, release])
 
   const checkNow = useCallback(() => {
     void runCheck({ manual: true })

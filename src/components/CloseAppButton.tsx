@@ -21,8 +21,8 @@ export function CloseAppButton() {
         className="btn close-app"
         onClick={requestClose}
         disabled={closing}
-        title="Cerrar Lectura Fiel"
-        aria-label="Cerrar Lectura Fiel"
+        title="Cerrar Lektor"
+        aria-label="Cerrar Lektor"
       >
         <span className="close-icon" aria-hidden="true">
           ⌁

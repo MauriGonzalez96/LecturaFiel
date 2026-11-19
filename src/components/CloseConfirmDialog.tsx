@@ -29,7 +29,7 @@ export function CloseConfirmDialog({
         aria-labelledby="close-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="close-title">¿Cerrar Lectura Fiel?</h2>
+        <h2 id="close-title">¿Cerrar Lektor?</h2>
         <p>
           Se cerrará la ventana y se terminarán todos los procesos de la
           aplicación.

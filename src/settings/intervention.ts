@@ -90,7 +90,7 @@ export function interventionOptions(mode: InterventionMode): InterventionOptions
   }
 }
 
-const STORAGE_KEY = 'lectura-fiel:intervention-mode'
+const STORAGE_KEY = 'lektor:intervention-mode'
 
 function migrateLegacy(raw: string | null): InterventionMode | null {
   if (!raw) return null

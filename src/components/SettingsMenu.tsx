@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useAppUpdate } from '../hooks/useAppUpdate'
 import { useDesktopClose } from '../hooks/useDesktopClose'
+import { useTheme } from '../hooks/useTheme'
 import {
   INTERVENTION_OPTIONS,
   type InterventionMode,
 } from '../settings/intervention'
+import type { ThemePreference } from '../theme/theme'
 import { APP_VERSION_LABEL } from '../version'
 import { CloseConfirmDialog } from './CloseConfirmDialog'
 import { UpdateDialog } from './UpdateDialog'
@@ -23,6 +25,12 @@ interface Props {
   onOpenAi?: () => void
 }
 
+const THEME_OPTIONS: { id: ThemePreference; label: string }[] = [
+  { id: 'light', label: 'Claro' },
+  { id: 'dark', label: 'Oscuro' },
+  { id: 'system', label: 'Sistema' },
+]
+
 /** Tuerca de configuración (voces, updates, caché, demo, cerrar). */
 export function SettingsMenu({
   onOpenVoices,
@@ -40,6 +48,7 @@ export function SettingsMenu({
   const rootRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
   const update = useAppUpdate()
+  const theme = useTheme()
   const {
     isDesktop,
     confirmOpen,
@@ -130,6 +139,33 @@ export function SettingsMenu({
             </p>
           </div>
 
+          <div
+            className="settings-block"
+            role="none"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <label className="settings-field" htmlFor="theme-mode">
+              Apariencia
+              <select
+                id="theme-mode"
+                value={theme.preference}
+                onChange={(e) =>
+                  theme.setPreference(e.target.value as ThemePreference)
+                }
+              >
+                {THEME_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="settings-hint">
+              Modo {theme.resolved === 'dark' ? 'oscuro' : 'claro'}
+              {theme.preference === 'system' ? ' (según el sistema)' : ''}.
+            </p>
+          </div>
+
           <div className="settings-sep" role="separator" />
 
           {onOpenEveryday && (
@@ -212,7 +248,7 @@ export function SettingsMenu({
                 className="settings-item settings-item-danger"
                 onClick={() => run(requestClose)}
               >
-                Cerrar Lectura Fiel
+                Cerrar Lektor
               </button>
             </>
           )}

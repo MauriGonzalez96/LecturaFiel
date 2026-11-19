@@ -15,7 +15,7 @@ import type {
   VoiceSource,
 } from '../voices/types'
 
-const LOCAL_PREFS_KEY = 'lectura-fiel:voice-prefs'
+const LOCAL_PREFS_KEY = 'lektor:voice-prefs'
 
 function normalizePrefs(prefs: VoicePrefs): VoicePrefs {
   return {

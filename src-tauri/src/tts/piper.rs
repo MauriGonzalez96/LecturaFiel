@@ -231,7 +231,7 @@ fn download_file(url: &str, dest: &Path) -> Result<(), String> {
     }
     let tmp = dest.with_extension("partial");
     let resp = ureq::get(url)
-        .set("User-Agent", "LecturaFiel/0.3.8")
+        .set("User-Agent", "Lektor/0.3.8")
         .call()
         .map_err(|e| format!("Descarga falló ({url}): {e}"))?;
     if !(200..300).contains(&resp.status()) {

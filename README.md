@@ -1,4 +1,4 @@
-# Lectura Fiel
+# Lektor
 
 Audiolibro / lector fiel al original: **simplificación léxica selectiva** y glosario.
 
@@ -39,7 +39,7 @@ git tag v4.0.1
 git push origin v4.0.1
 ```
 
-4. GitHub Actions (**Release Tauri**) publica el instalador NSIS en [Releases](https://github.com/MauriGonzalez96/LecturaFiel/releases).
+4. GitHub Actions (**Release Tauri**) publica el instalador NSIS en [Releases](https://github.com/MauriGonzalez96/Lektor/releases).
 
 ### En la app
 
@@ -55,7 +55,7 @@ El instalable **no está firmado** con certificado de Microsoft, así que Window
 1. Clic derecho → **Propiedades** → **Desbloquear** → Aceptar.
 2. O al abrirlo: **Más información** → **Ejecutar de todas formas**.
 
-Los datos (voces Piper, preferencias) se guardan en `%LOCALAPPDATA%\LecturaFiel`.
+Los datos (voces Piper, preferencias) se guardan en `%LOCALAPPDATA%\Lektor`.
 
 ## Qué incluye
 

@@ -15,8 +15,8 @@ export type SpeakOptions = {
   onSentence?: (sentenceIndex: number) => void
 }
 
-const VOICE_KEY = 'lectura-fiel:voiceURI'
-const LOCAL_PREFS_KEY = 'lectura-fiel:voice-prefs'
+const VOICE_KEY = 'lektor:voiceURI'
+const LOCAL_PREFS_KEY = 'lektor:voice-prefs'
 
 function scoreVoice(v: SpeechSynthesisVoice): number {
   const name = v.name.toLowerCase()

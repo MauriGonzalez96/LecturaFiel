@@ -16,7 +16,7 @@ describe('migrateAiModel / loadAiConfig', () => {
 
   it('migra gemini-2.0-flash al cargar', async () => {
     localStorage.setItem(
-      'lectura-fiel:ai-config',
+      'lektor:ai-config',
       JSON.stringify({
         baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
         apiKey: 'x',
@@ -26,7 +26,7 @@ describe('migrateAiModel / loadAiConfig', () => {
     const { loadAiConfig, migrateAiModel } = await import('./config')
     expect(migrateAiModel('gemini-2.0-flash')).toBe('gemini-3-flash-preview')
     expect(loadAiConfig().model).toBe('gemini-3-flash-preview')
-    expect(JSON.parse(localStorage.getItem('lectura-fiel:ai-config')!).model).toBe(
+    expect(JSON.parse(localStorage.getItem('lektor:ai-config')!).model).toBe(
       'gemini-3-flash-preview',
     )
   })

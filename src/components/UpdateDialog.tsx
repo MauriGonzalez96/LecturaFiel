@@ -57,7 +57,7 @@ function UpdateModalBody({
   error: string | null
   localVersion: string
   onDismiss: () => void
-  onAccept: () => void
+  onAccept: () => void | Promise<void>
   onClose: () => void
 }) {
   if (status === 'checking') {
@@ -139,22 +139,38 @@ function UpdateModalBody({
   if (status === 'downloading' && release) {
     return (
       <>
-        <h2 id={titleId}>Descarga iniciada</h2>
+        <h2 id={titleId}>Actualizando…</h2>
         <p>
-          Se está bajando <strong>{release.assetName ?? release.tag}</strong>.
-          Cuando termine, <strong>cerrá esta app</strong> y abrí el nuevo{' '}
-          <code>.exe</code> (no se puede reemplazar el que está en uso).
+          Descargando <strong>{release.assetName ?? release.tag}</strong> e
+          iniciando el instalador. La app se cerrará sola para poder
+          reemplazarla.
         </p>
         <p className="update-meta">
-          Si el navegador bloqueó la descarga, usá{' '}
+          Si no se abre el instalador, usá{' '}
           <a href={release.htmlUrl} target="_blank" rel="noreferrer">
             la página del release
           </a>
           .
         </p>
+      </>
+    )
+  }
+
+  if (status === 'installFailed') {
+    return (
+      <>
+        <h2 id={titleId}>No se pudo actualizar</h2>
+        <p>{error ?? 'Error desconocido al instalar la actualización.'}</p>
+        <p className="update-meta">
+          Podés instalar a mano desde{' '}
+          <a href={RELEASES_PAGE} target="_blank" rel="noreferrer">
+            GitHub Releases
+          </a>
+          .
+        </p>
         <div className="modal-actions">
           <button type="button" className="btn primary" onClick={onClose}>
-            Entendido
+            Cerrar
           </button>
         </div>
       </>
@@ -186,7 +202,7 @@ function UpdateModalBody({
         ) : null}
         <p className="update-meta">
           {release.downloadUrl
-            ? 'Al actualizar se descarga el .exe. Después cerrá Lectura Fiel y abrí el nuevo archivo.'
+            ? 'Al actualizar se descarga el instalador, se abre y Lektor se cierra para completar el update.'
             : 'No hay .exe en el release; te abrimos la página de GitHub.'}
         </p>
         <div className="modal-actions">
@@ -196,7 +212,7 @@ function UpdateModalBody({
           <button
             type="button"
             className="btn primary"
-            onClick={onAccept}
+            onClick={() => void onAccept()}
             autoFocus
           >
             Actualizar

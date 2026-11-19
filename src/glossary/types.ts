@@ -18,7 +18,7 @@ export interface GlossaryBookRecord {
  */
 export interface GlossaryVaultFile {
   version: 1
-  app: 'lectura-fiel'
+  app: 'lektor' | 'lectura-fiel'
   updatedAt: string
   books: GlossaryBookRecord[]
 }
@@ -26,7 +26,7 @@ export interface GlossaryVaultFile {
 export function emptyVault(): GlossaryVaultFile {
   return {
     version: 1,
-    app: 'lectura-fiel',
+    app: 'lektor',
     updatedAt: new Date().toISOString(),
     books: [],
   }

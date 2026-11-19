@@ -1,4 +1,7 @@
-/** IndexedDB compartido de Lectura Fiel. */
+/**
+ * IndexedDB interno. Se mantiene el id histórico para no perder biblioteca/glosario.
+ * La marca visible es Lektor.
+ */
 export const IDB_NAME = 'lectura-fiel'
 /** Subir al agregar stores. Todos los openDb deben usar esta versión. */
 export const IDB_VERSION = 3

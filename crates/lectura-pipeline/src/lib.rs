@@ -1,4 +1,4 @@
-//! Motor léxico Lectura Fiel (nativo / WASM).
+//! Motor léxico Lektor (nativo / WASM).
 //! Paridad aproximada con el Worker TypeScript: léxico semilla + arcaísmos +
 //! everyday + sinónimos fáciles según nivel de intervención (1–4).
 

@@ -2,7 +2,7 @@
 name = "lectura-pipeline"
 version = "0.1.0"
 edition = "2021"
-description = "Motor léxico de Lectura Fiel (WASM / nativo: léxico, arcaísmos, everyday, sinónimos)"
+description = "Motor léxico de Lektor (WASM / nativo: léxico, arcaísmos, everyday, sinónimos)"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false

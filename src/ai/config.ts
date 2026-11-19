@@ -1,7 +1,7 @@
 import { GEMINI_OPENAI_BASE } from './providers'
 import type { AiConfig } from './types'
 
-const STORAGE_KEY = 'lectura-fiel:ai-config'
+const STORAGE_KEY = 'lektor:ai-config'
 
 /** Modelos Gemini retirados o bloqueados para cuentas nuevas → reemplazo. */
 const DEPRECATED_GEMINI_MODELS: Record<string, string> = {

@@ -50,7 +50,7 @@ export function GlossaryPanel({
     })
     if (!ok) {
       setPopupError(
-        'El navegador bloqueó la ventana. Permití ventanas emergentes para Lectura Fiel.',
+        'El navegador bloqueó la ventana. Permití ventanas emergentes para Lektor.',
       )
     }
   }

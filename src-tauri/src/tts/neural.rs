@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Once;
 
 use msedge_tts::tts::client::connect;
 use msedge_tts::tts::SpeechConfig;
@@ -6,8 +7,16 @@ use msedge_tts::tts::SpeechConfig;
 use super::paths;
 
 const MAX_CHARS: usize = 2800;
+static INSTALL_CRYPTO: Once = Once::new();
+
+fn ensure_rustls_crypto() {
+    INSTALL_CRYPTO.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 pub fn synthesize_neural(voice_id: &str, text: &str, rate: Option<f64>) -> Result<PathBuf, String> {
+    ensure_rustls_crypto();
     let clean = normalize_text(text)?;
     let dest = paths::audio_dir()?.join(format!("{}.mp3", uuid_hex()));
 
@@ -69,4 +78,26 @@ fn uuid_hex() -> String {
 
 fn file_len(path: &Path) -> Result<u64, String> {
     Ok(std::fs::metadata(path).map_err(|e| e.to_string())?.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn neural_preview_writes_mp3() {
+        if std::env::var("LEKTOR_LIVE_TTS").ok().as_deref() != Some("1") {
+            eprintln!("omitido: seteá LEKTOR_LIVE_TTS=1 para probar Edge TTS");
+            return;
+        }
+        let path = synthesize_neural(
+            "es-AR-ElenaNeural",
+            "Hola, esto es una prueba breve de Lektor.",
+            Some(0.9),
+        )
+        .expect("síntesis neural");
+        assert!(path.is_file(), "falta archivo {:?}", path);
+        assert!(file_len(&path).unwrap() > 500, "audio demasiado chico");
+        let _ = std::fs::remove_file(&path);
+    }
 }

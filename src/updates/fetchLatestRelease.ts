@@ -38,7 +38,7 @@ function pickExeAsset(assets: GhAsset[], version: string): GhAsset | null {
 
   const versioned = exes.find(
     (a) =>
-      a.name.toLowerCase() === `lecturafiel-v${version}.exe`.toLowerCase() ||
+      a.name.toLowerCase() === `lektor-v${version}.exe`.toLowerCase() ||
       a.name.toLowerCase().includes(`-v${version}.exe`.toLowerCase()) ||
       a.name.toLowerCase().includes(`_${version}_`),
   )
@@ -89,17 +89,4 @@ export async function fetchLatestRelease(
   }
 }
 
-/** Dispara la descarga del .exe (o abre la página del release). */
-export function startUpdateDownload(release: LatestRelease): void {
-  if (release.downloadUrl) {
-    const a = document.createElement('a')
-    a.href = release.downloadUrl
-    a.rel = 'noopener noreferrer'
-    a.download = release.assetName ?? `LecturaFiel-v${release.version}.exe`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    return
-  }
-  window.open(release.htmlUrl, '_blank', 'noopener,noreferrer')
-}
+export { startUpdateDownload } from './startUpdateDownload'

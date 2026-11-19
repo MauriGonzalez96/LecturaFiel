@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSpeech } from '../hooks/useSpeech'
 import { useVoiceSettings } from '../hooks/useVoiceSettings'
-import { downloadPiperVoice, previewVoice } from '../voices/api'
+import {
+  downloadPiperVoice,
+  formatVoiceError,
+  previewVoice,
+} from '../voices/api'
 import {
   clampSpeechRate,
   DEFAULT_SPEECH_RATE,
@@ -11,12 +15,14 @@ import { SpeechRateControl } from './SpeechRateControl'
 
 interface Props {
   onClose?: () => void
+  /** Variante embebida en modal de ajustes. */
+  compact?: boolean
 }
 
 /**
- * Estudio de voces: Windows, Piper (local) y Edge neural (online).
+ * Voces globales: una sola elección para libro, original y resúmenes IA.
  */
-export function VoiceStudio({ onClose }: Props) {
+export function VoiceStudio({ onClose, compact = false }: Props) {
   const {
     ready,
     apiOk,
@@ -44,15 +50,23 @@ export function VoiceStudio({ onClose }: Props) {
   const [rate, setRateLocal] = useState(() =>
     clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE),
   )
+  const [filter, setFilter] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const blobUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (prefs.source) setTab(prefs.source)
     if (prefs.voiceId) setSelectedId(prefs.voiceId)
     setRateLocal(clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE))
   }, [prefs.source, prefs.voiceId, prefs.rate])
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
+    }
+  }, [])
 
   const windowsList = useMemo(
     () =>
@@ -73,6 +87,18 @@ export function VoiceStudio({ onClose }: Props) {
       audioRef.current.src = ''
       audioRef.current = null
     }
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current)
+      blobUrlRef.current = null
+    }
+  }
+
+  async function playUrl(url: string, doneMsg: string) {
+    if (url.startsWith('blob:')) blobUrlRef.current = url
+    const audio = new Audio(url)
+    audioRef.current = audio
+    audio.onended = () => setMsg(doneMsg)
+    await audio.play()
   }
 
   async function listenSample() {
@@ -87,40 +113,32 @@ export function VoiceStudio({ onClose }: Props) {
       if (tab === 'windows') {
         setVoiceURI(selectedId)
         void speak(sampleText)
-        setMsg('Reproduciendo muestra (Windows)…')
+        setMsg('Reproduciendo muestra…')
         return
       }
       if (!apiOk) {
-        setMsg(
-          'Piper y neurales solo están en el .exe (o desktop\\run_dev.bat).',
-        )
+        setMsg('Piper y Neural solo están disponibles en Lektor.exe.')
         return
       }
       if (tab === 'piper') {
         const info = piperVoices.find((v) => v.id === selectedId)
         if (info && !info.installed) {
-          setMsg('Descargando modelo Piper (solo la primera vez)…')
+          setMsg('Descargando modelo Piper…')
           await downloadPiperVoice(selectedId)
           await reload()
         }
-        setMsg('Sintetizando con Piper…')
+        setMsg('Sintetizando…')
         const url = await previewVoice('piper', selectedId, sampleText, rate)
-        const audio = new Audio(url)
-        audioRef.current = audio
-        audio.onended = () => setMsg('Muestra terminada.')
-        await audio.play()
+        await playUrl(url, 'Muestra terminada.')
         setMsg('Reproduciendo Piper…')
         return
       }
-      setMsg('Generando muestra neural (internet)…')
+      setMsg('Generando muestra neural…')
       const url = await previewVoice('neural', selectedId, sampleText, rate)
-      const audio = new Audio(url)
-      audioRef.current = audio
-      audio.onended = () => setMsg('Muestra terminada.')
-      await audio.play()
+      await playUrl(url, 'Muestra terminada.')
       setMsg('Reproduciendo neural…')
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'No se pudo reproducir')
+      setMsg(formatVoiceError(e, 'No se pudo reproducir'))
     } finally {
       setBusy(false)
     }
@@ -137,22 +155,22 @@ export function VoiceStudio({ onClose }: Props) {
       if (tab === 'piper' && apiOk) {
         const info = piperVoices.find((v) => v.id === selectedId)
         if (info && !info.installed) {
-          setMsg('Descargando modelo antes de guardar…')
+          setMsg('Descargando modelo…')
           await downloadPiperVoice(selectedId)
           await reload()
         }
       }
       await save(tab, selectedId, rate)
       if (tab === 'windows') setVoiceURI(selectedId)
-      setMsg('Voz y velocidad guardadas. El lector las usará a partir de ahora.')
+      setMsg('Voz guardada para todo lo que lee la app.')
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'No se pudo guardar')
+      setMsg(formatVoiceError(e, 'No se pudo guardar'))
     } finally {
       setBusy(false)
     }
   }
 
-  const list =
+  const rawList =
     tab === 'windows'
       ? windowsList
       : tab === 'piper'
@@ -173,14 +191,59 @@ export function VoiceStudio({ onClose }: Props) {
             gender: v.gender,
           }))
 
+  const list = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    const filtered = q
+      ? rawList.filter(
+          (v) =>
+            v.name.toLowerCase().includes(q) ||
+            v.locale.toLowerCase().includes(q) ||
+            v.id.toLowerCase().includes(q),
+        )
+      : rawList
+
+    if (tab !== 'neural') return filtered
+
+    // Español primero para neural.
+    return [...filtered].sort((a, b) => {
+      const ae = /^es/i.test(a.locale) || /spanish|español/i.test(a.name) ? 0 : 1
+      const be = /^es/i.test(b.locale) || /spanish|español/i.test(b.name) ? 0 : 1
+      if (ae !== be) return ae - be
+      return a.name.localeCompare(b.name, 'es')
+    })
+  }, [filter, rawList, tab])
+
+  function selectTab(next: VoiceSource) {
+    stopAll()
+    setTab(next)
+    setFilter('')
+    if (next === 'piper') {
+      setSelectedId(
+        prefs.source === 'piper' ? prefs.voiceId : piperVoices[0]?.id ?? null,
+      )
+    } else if (next === 'windows') {
+      setSelectedId(
+        prefs.source === 'windows'
+          ? prefs.voiceId
+          : windowsList[0]?.id ?? null,
+      )
+    } else {
+      setSelectedId(
+        prefs.source === 'neural'
+          ? prefs.voiceId
+          : neuralVoices[0]?.id ?? null,
+      )
+      if (!apiOk) void reload()
+    }
+  }
+
   return (
-    <div className="voice-studio">
+    <div className={`voice-studio${compact ? ' voice-studio-compact' : ''}`}>
       <div className="voice-studio-head">
         <div>
           <h2>Voces</h2>
           <p className="voice-studio-lede">
-            Elegí Windows, Piper (modelo local offline) o Neural Edge (online).
-            Escuchá una muestra y guardá la que más te guste.
+            Una voz para el libro, el original y los resúmenes IA.
           </p>
         </div>
         {onClose && (
@@ -193,92 +256,85 @@ export function VoiceStudio({ onClose }: Props) {
       {!ready && <p className="hint">Cargando voces…</p>}
       {error && <p className="upload-error">{error}</p>}
 
-      {prefs.defaultApplied && prefs.source === 'piper' && (
-        <p className="voice-banner">
-          Primera apertura: se descargó y configuró{' '}
-          <strong>es_AR-daniela-high</strong> (Piper, Argentina). Podés cambiarla
-          cuando quieras.
+      {prefs.source && prefs.voiceId && (
+        <p className="voice-active-chip">
+          Activa: <strong>{prefs.source}</strong> · {prefs.voiceId} ·{' '}
+          {clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE).toFixed(2)}×
         </p>
       )}
 
-      <div className="tabs" role="tablist">
+      <div className="voice-engine-tabs" role="tablist" aria-label="Motor de voz">
         <button
           type="button"
-          className={tab === 'piper' ? 'tab active' : 'tab'}
-          onClick={() => {
-            stopAll()
-            setTab('piper')
-            setSelectedId(
-              prefs.source === 'piper'
-                ? prefs.voiceId
-                : piperVoices[0]?.id ?? null,
-            )
-          }}
+          role="tab"
+          aria-selected={tab === 'piper'}
+          className={tab === 'piper' ? 'voice-engine active' : 'voice-engine'}
+          onClick={() => selectTab('piper')}
         >
-          Piper ({apiOk ? piperVoices.length : 'exe'})
+          Piper {apiOk ? `(${piperVoices.length})` : ''}
         </button>
         <button
           type="button"
-          className={tab === 'windows' ? 'tab active' : 'tab'}
-          onClick={() => {
-            stopAll()
-            setTab('windows')
-            setSelectedId(
-              prefs.source === 'windows'
-                ? prefs.voiceId
-                : windowsList[0]?.id ?? null,
-            )
-          }}
+          role="tab"
+          aria-selected={tab === 'windows'}
+          className={tab === 'windows' ? 'voice-engine active' : 'voice-engine'}
+          onClick={() => selectTab('windows')}
         >
           Windows ({windowsList.length})
         </button>
         <button
           type="button"
-          className={tab === 'neural' ? 'tab active' : 'tab'}
-          onClick={() => {
-            stopAll()
-            setTab('neural')
-            setSelectedId(
-              prefs.source === 'neural'
-                ? prefs.voiceId
-                : neuralVoices[0]?.id ?? null,
-            )
-            if (!apiOk) void reload()
-          }}
+          role="tab"
+          aria-selected={tab === 'neural'}
+          className={tab === 'neural' ? 'voice-engine active' : 'voice-engine'}
+          onClick={() => selectTab('neural')}
         >
-          Neural ({apiOk ? neuralVoices.length : 'exe'})
+          Neural {apiOk ? `(${neuralVoices.length})` : ''}
         </button>
       </div>
 
       {tab !== 'windows' && !apiOk && (
         <p className="hint">
-          Piper y Neural requieren <strong>LecturaFiel.exe</strong> o{' '}
-          <code>desktop\run_dev.bat</code>. Piper descarga el modelo una vez; Neural
-          usa internet en cada lectura.
+          Piper y Neural requieren la app de escritorio (
+          <strong>Lektor.exe</strong>).
         </p>
       )}
 
-      <label className="block">
+      <div className="voice-controls-row">
+        <label className="voice-filter">
+          Buscar
+          <input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={
+              tab === 'neural' ? 'ej. Argentina, Marcelo…' : 'Nombre o idioma'
+            }
+          />
+        </label>
+        <SpeechRateControl
+          rate={rate}
+          onChange={(next) => {
+            setRateLocal(next)
+            void setRate(next)
+          }}
+          disabled={busy}
+          compact
+        />
+      </div>
+
+      <label className="block voice-sample">
         Texto de muestra
         <textarea
-          rows={3}
+          rows={compact ? 2 : 3}
           value={sampleText}
           onChange={(e) => setSampleText(e.target.value)}
         />
       </label>
 
-      <SpeechRateControl
-        rate={rate}
-        onChange={(next) => {
-          setRateLocal(next)
-          void setRate(next)
-        }}
-        disabled={busy}
-      />
-
       <div className="voice-list" role="listbox" aria-label="Lista de voces">
         {list.length === 0 ? (
-          <p className="hint">No hay voces en esta categoría.</p>
+          <p className="hint">No hay voces con ese filtro.</p>
         ) : (
           list.map((v) => (
             <button
@@ -288,16 +344,16 @@ export function VoiceStudio({ onClose }: Props) {
               aria-selected={selectedId === v.id}
               className={`voice-item${selectedId === v.id ? ' selected' : ''}`}
               onClick={() => setSelectedId(v.id)}
+              onDoubleClick={() => void listenSample()}
             >
               <span className="voice-item-name">{v.name}</span>
               <span className="voice-item-meta">
                 {v.locale}
                 {'quality' in v && v.quality ? ` · ${v.quality}` : ''}
-                {'natural' in v && v.natural ? ' · natural' : ''}
                 {'installed' in v && tab === 'piper'
                   ? v.installed
-                    ? ' · instalada'
-                    : ' · pendiente de descarga'
+                    ? ' · lista'
+                    : ' · descarga'
                   : ''}
               </span>
             </button>
@@ -312,10 +368,10 @@ export function VoiceStudio({ onClose }: Props) {
           onClick={() => void listenSample()}
           disabled={busy || !selectedId}
         >
-          ▶ Escuchar muestra
+          Escuchar
         </button>
         <button type="button" className="btn ghost" onClick={stopAll}>
-          ⏹ Detener
+          Detener
         </button>
         <button
           type="button"
@@ -328,16 +384,7 @@ export function VoiceStudio({ onClose }: Props) {
       </div>
 
       {msg && <p className="voice-msg">{msg}</p>}
-      {busy && status === 'loading' && (
-        <p className="hint">Procesando…</p>
-      )}
-
-      {prefs.source && prefs.voiceId && (
-        <p className="hint">
-          Voz activa: <strong>{prefs.source}</strong> · {prefs.voiceId} ·{' '}
-          {clampSpeechRate(prefs.rate ?? DEFAULT_SPEECH_RATE).toFixed(2)}×
-        </p>
-      )}
+      {busy && status === 'loading' && <p className="hint">Procesando…</p>}
     </div>
   )
 }

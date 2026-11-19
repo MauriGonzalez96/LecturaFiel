@@ -1,7 +1,7 @@
 import type { DecisionCacheRecord, SubstitutionDecision } from '../types/lexicon'
 import { isBogusSubstitute } from './simplify'
 
-const STORAGE_KEY = 'lectura-fiel:decision-cache'
+const STORAGE_KEY = 'lektor:decision-cache'
 
 /** Clave: modo|lema|prev — el modo evita mezclar decisiones entre niveles 1–4. */
 export function cacheKey(

@@ -1,6 +1,6 @@
 import { stripDiacritics } from './commonSpanish'
 
-const STORAGE_KEY = 'lectura-fiel:user-everyday'
+const STORAGE_KEY = 'lektor:user-everyday'
 
 type Listener = () => void
 

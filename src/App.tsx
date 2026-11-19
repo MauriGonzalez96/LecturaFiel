@@ -22,7 +22,7 @@ import { FileUpload } from './components/FileUpload'
 import { BookNav } from './components/BookNav'
 import { LibraryShelf } from './components/LibraryShelf'
 import { SettingsMenu } from './components/SettingsMenu'
-import { VoiceStudio } from './components/VoiceStudio'
+import { VoicesSettingsDialog } from './components/VoicesSettingsDialog'
 import { AiSettingsPanel } from './components/AiSettingsPanel'
 import {
   buildSummaryChapterOptions,
@@ -50,7 +50,7 @@ import { DEMO_ENABLED } from './env'
 import type { IngestedBook } from './ingest/types'
 import { APP_VERSION_LABEL } from './version'
 
-type Tab = 'read' | 'glossary' | 'review' | 'voices' | 'everyday' | 'ai'
+type Tab = 'read' | 'glossary' | 'review' | 'everyday' | 'ai'
 
 export default function App() {
   const library = useLibrary()
@@ -66,7 +66,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('read')
   const tabRef = useRef<Tab>('read')
   tabRef.current = tab
-  const voicesReturnTabRef = useRef<Tab>('read')
+  const [voicesOpen, setVoicesOpen] = useState(false)
   const [cacheTick, setCacheTick] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [seekNonce, setSeekNonce] = useState(0)
@@ -403,25 +403,27 @@ export default function App() {
   )
 
   const workspaceTitle =
-    tab === 'voices'
-      ? 'Estudio de voces'
-      : tab === 'ai'
-        ? 'Resumen IA del capítulo'
-        : tab === 'everyday'
-          ? 'Vocabulario cotidiano'
-          : tab === 'glossary' && emptyProduction
-            ? 'Archivo de glosario'
-            : emptyProduction
-              ? 'Esperando un libro'
-              : title || `Capítulo ${chapter}`
+    tab === 'ai'
+      ? 'Resumen IA del capítulo'
+      : tab === 'everyday'
+        ? 'Vocabulario cotidiano'
+        : tab === 'glossary' && emptyProduction
+          ? 'Archivo de glosario'
+          : emptyProduction
+            ? 'Esperando un libro'
+            : title || `Capítulo ${chapter}`
+
+  const showPlayerDock = !emptyProduction && tab !== 'review'
 
   return (
-    <div className="app app-shell">
+    <div
+      className={`app app-shell${showPlayerDock ? ' has-player-dock' : ''}`}
+    >
       <div className="atmosphere" aria-hidden="true" />
 
       <header className="app-chrome">
         <div className="chrome-brand">
-          <p className="brand">Lectura Fiel</p>
+          <p className="brand">Lektor</p>
         </div>
 
         <div className="chrome-context">
@@ -439,9 +441,7 @@ export default function App() {
               key={id}
               type="button"
               className={
-                tab === id || (id === 'read' && tab === 'voices')
-                  ? 'chrome-nav-btn active'
-                  : 'chrome-nav-btn'
+                tab === id ? 'chrome-nav-btn active' : 'chrome-nav-btn'
               }
               aria-current={tab === id ? 'page' : undefined}
               onClick={() => setTab(id)}
@@ -453,11 +453,7 @@ export default function App() {
 
         <div className="chrome-actions">
           <SettingsMenu
-            onOpenVoices={() => {
-              voicesReturnTabRef.current =
-                tabRef.current === 'voices' ? 'read' : tabRef.current
-              setTab('voices')
-            }}
+            onOpenVoices={() => setVoicesOpen(true)}
             onClearCache={clearCache}
             onDemo={DEMO_ENABLED ? goDemo : undefined}
             demoEnabled={DEMO_ENABLED}
@@ -590,22 +586,9 @@ export default function App() {
                 Volver al glosario
               </button>
             )}
-            {tab === 'voices' && (
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setTab(voicesReturnTabRef.current)}
-              >
-                Volver
-              </button>
-            )}
           </div>
 
-          {tab === 'voices' ? (
-            <VoiceStudio
-              onClose={() => setTab(voicesReturnTabRef.current)}
-            />
-          ) : tab === 'ai' && emptyProduction ? (
+          {tab === 'ai' && emptyProduction ? (
             <AiSettingsPanel
               onClose={() => setTab('read')}
               onSaved={() => setAiConfigTick((n) => n + 1)}
@@ -836,57 +819,6 @@ export default function App() {
                       )}
                     </>
                   )}
-                  <AudioPlayer
-                    adaptedText={result.adaptedText}
-                    originalText={result.originalText}
-                    summaryText={
-                      listenOverride ?? chapterSummary.summaryText
-                    }
-                    chapterKey={`${book?.id ?? 'demo'}:${chapterIndex}`}
-                    currentLabel={currentChapterLabel}
-                    hasNextChapter={hasNextChapter}
-                    nextChapterLabel={nextChapterLabel}
-                    onAdvanceChapter={advanceChapter}
-                    onOpenVoices={() => {
-                      voicesReturnTabRef.current =
-                        tabRef.current === 'voices' ? 'read' : tabRef.current
-                      setTab('voices')
-                    }}
-                    resumeSentenceIndex={showDemo ? 0 : sentenceIndex}
-                    onSentenceProgress={
-                      showDemo ? undefined : saveSentenceProgress
-                    }
-                    seekNonce={seekNonce}
-                    listenSummaryNonce={listenSummaryNonce}
-                    summaryStatus={
-                      listenOverride ? 'ready' : chapterSummary.status
-                    }
-                    onSummaryHeard={() => {
-                      if (listenOverride) return
-                      const id = showDemo ? 'demo' : book?.id
-                      if (!id) return
-                      markSummaryHeard(id, showDemo ? 0 : chapterIndex)
-                      setHeardTick((n) => n + 1)
-                    }}
-                    onGenerateSummaryForChain={() => {
-                      if (listenOverride) return
-                      if (!chapterSummary.canRun) return
-                      if (chapterSummary.status === 'loading') return
-                      void chapterSummary.generate(false).then(() => {
-                        setSummaryIndexTick((n) => n + 1)
-                      })
-                    }}
-                    onNowPlaying={(info) => {
-                      setNowPlaying(info)
-                      // No expulsar de Voces mientras se elige timbre.
-                      if (
-                        info?.source === 'summary' &&
-                        tabRef.current !== 'voices'
-                      ) {
-                        setTab('ai')
-                      }
-                    }}
-                  />
                 </>
               )}
 
@@ -952,11 +884,59 @@ export default function App() {
           {MAX_LIBRARY_SLOTS} libros · glosario archivado · {APP_VERSION_LABEL}
         </p>
         <p className="foot-version" title="Versión de esta build">
-          Lectura Fiel {APP_VERSION_LABEL}
+          Lektor {APP_VERSION_LABEL}
           {library.saving ? ' · guardando…' : ''}
           {pipelinePending ? ' · adaptando…' : ''}
         </p>
       </footer>
+
+      {showPlayerDock && (
+        <div className="player-dock" role="region" aria-label="Reproductor">
+          <AudioPlayer
+            variant="dock"
+            adaptedText={result.adaptedText}
+            originalText={result.originalText}
+            summaryText={listenOverride ?? chapterSummary.summaryText}
+            chapterKey={`${book?.id ?? 'demo'}:${chapterIndex}`}
+            currentLabel={currentChapterLabel}
+            hasNextChapter={hasNextChapter}
+            nextChapterLabel={nextChapterLabel}
+            onAdvanceChapter={advanceChapter}
+            onOpenVoices={() => setVoicesOpen(true)}
+            resumeSentenceIndex={showDemo ? 0 : sentenceIndex}
+            onSentenceProgress={showDemo ? undefined : saveSentenceProgress}
+            seekNonce={seekNonce}
+            listenSummaryNonce={listenSummaryNonce}
+            summaryStatus={listenOverride ? 'ready' : chapterSummary.status}
+            onSummaryHeard={() => {
+              if (listenOverride) return
+              const id = showDemo ? 'demo' : book?.id
+              if (!id) return
+              markSummaryHeard(id, showDemo ? 0 : chapterIndex)
+              setHeardTick((n) => n + 1)
+            }}
+            onGenerateSummaryForChain={() => {
+              if (listenOverride) return
+              if (!chapterSummary.canRun) return
+              if (chapterSummary.status === 'loading') return
+              void chapterSummary.generate(false).then(() => {
+                setSummaryIndexTick((n) => n + 1)
+              })
+            }}
+            onNowPlaying={(info) => {
+              setNowPlaying(info)
+              if (info?.source === 'summary') {
+                setTab('ai')
+              }
+            }}
+          />
+        </div>
+      )}
+
+      <VoicesSettingsDialog
+        open={voicesOpen}
+        onClose={() => setVoicesOpen(false)}
+      />
     </div>
   )
 }

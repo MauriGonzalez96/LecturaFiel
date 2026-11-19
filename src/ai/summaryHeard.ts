@@ -1,4 +1,4 @@
-const KEY = 'lectura-fiel:heard-summaries'
+const KEY = 'lektor:heard-summaries'
 
 function readAll(): Record<string, number[]> {
   try {

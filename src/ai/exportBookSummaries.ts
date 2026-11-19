@@ -61,7 +61,7 @@ export function buildBookSummariesMarkdown(opts: {
   const lines: string[] = [
     `# ${opts.bookTitle.trim() || 'Libro'}`,
     '',
-    `> Explicaciones detalladas · Lectura Fiel`,
+    `> Explicaciones detalladas · Lektor`,
     '',
   ]
 
@@ -119,7 +119,7 @@ export function downloadBookSummariesMarkdown(opts: {
       .replace(/[^\p{L}\p{N}]+/gu, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 60) || 'libro'
-  downloadTextFile(`lectura-fiel-resumenes-${slug}.md`, md)
+  downloadTextFile(`lektor-resumenes-${slug}.md`, md)
 }
 
 function excerptSummary(summary: string, max = 180): string {

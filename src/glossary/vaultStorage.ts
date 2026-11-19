@@ -48,7 +48,7 @@ export function parseVaultJson(raw: string): GlossaryVaultFile {
   }
   return {
     version: 1,
-    app: 'lectura-fiel',
+    app: 'lektor',
     updatedAt: data.updatedAt || new Date().toISOString(),
     books: data.books,
   }

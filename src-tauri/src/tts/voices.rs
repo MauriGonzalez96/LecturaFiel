@@ -47,6 +47,8 @@ pub fn list_neural_voices() -> Vec<NeuralVoice> {
 }
 
 fn try_list_edge_voices() -> Result<Vec<NeuralVoice>, String> {
+    // Misma provisión TLS que síntesis (rustls 0.23 exige CryptoProvider).
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let voices = msedge_tts::voice::get_voices_list().map_err(|e| e.to_string())?;
     let mut out: Vec<NeuralVoice> = voices
         .into_iter()

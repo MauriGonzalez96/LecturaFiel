@@ -70,7 +70,7 @@ export function AiSettingsPanel({ onClose, onSaved }: Props) {
           <h2>Resúmenes con IA</h2>
           <p className="muted">
             Conectá Gemini (u otro proveedor) con una API key. Se guarda solo en
-            este equipo; no hay login dentro de Lectura Fiel.
+            este equipo; no hay login dentro de Lektor.
           </p>
         </div>
         <button type="button" className="btn ghost" onClick={onClose}>

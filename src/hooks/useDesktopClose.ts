@@ -4,7 +4,7 @@ import { closeDesktopApp, isDesktopShell } from '../desktop/bridge'
 /**
  * Cierre de escritorio (Tauri):
  * - Botón in-app → confirmación → closeDesktopApp()
- * - X del SO → __lecturaFielRequestClose → mismo diálogo
+ * - X del SO → __lektorRequestClose → mismo diálogo
  */
 export function useDesktopClose() {
   const isDesktop = isDesktopShell()
@@ -30,9 +30,9 @@ export function useDesktopClose() {
 
   useEffect(() => {
     if (!isDesktop) return
-    window.__lecturaFielRequestClose = requestClose
+    window.__lektorRequestClose = requestClose
     return () => {
-      delete window.__lecturaFielRequestClose
+      delete window.__lektorRequestClose
     }
   }, [isDesktop, requestClose])
 
