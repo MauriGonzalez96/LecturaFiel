@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { splitSentences } from '../engine/sentences'
 import { useSpeech, type SpeechStatus } from '../hooks/useSpeech'
 import { useSpeechRate } from '../hooks/useSpeechRate'
@@ -22,8 +23,12 @@ interface Props {
   onOpenVoices?: () => void
   /** Oración guardada (0 = inicio). */
   resumeSentenceIndex?: number
+  /** Oración del resumen IA (cursor / reanudación). */
+  resumeSummaryIndex?: number
   /** Persistir oración actual (audio / pausa). */
   onSentenceProgress?: (sentenceIndex: number) => void
+  /** Persistir oración del resumen (cursor). */
+  onSummarySentenceProgress?: (sentenceIndex: number) => void
   /** Incrementa al colocar el cursor a mano → si hay audio, salta ahí. */
   seekNonce?: number
   /** Incrementa para forzar reproducción del resumen IA. */
@@ -97,7 +102,9 @@ export function AudioPlayer({
   onAdvanceChapter,
   onOpenVoices,
   resumeSentenceIndex = 0,
+  resumeSummaryIndex = 0,
   onSentenceProgress,
+  onSummarySentenceProgress,
   seekNonce = 0,
   listenSummaryNonce = 0,
   summaryStatus = 'idle',
@@ -133,7 +140,9 @@ export function AudioPlayer({
   const sourceRef = useRef(source)
   const speakRef = useRef(speak)
   const progressRef = useRef(onSentenceProgress)
+  const summaryProgressRef = useRef(onSummarySentenceProgress)
   const resumeIdxRef = useRef(resumeSentenceIndex)
+  const resumeSummaryIdxRef = useRef(resumeSummaryIndex)
   const heardRef = useRef(onSummaryHeard)
   const generateChainRef = useRef(onGenerateSummaryForChain)
   const generateRequestedForRef = useRef<string | number | null>(null)
@@ -149,7 +158,9 @@ export function AudioPlayer({
   sourceRef.current = source
   speakRef.current = speak
   progressRef.current = onSentenceProgress
+  summaryProgressRef.current = onSummarySentenceProgress
   resumeIdxRef.current = resumeSentenceIndex
+  resumeSummaryIdxRef.current = resumeSummaryIndex
   heardRef.current = onSummaryHeard
   generateChainRef.current = onGenerateSummaryForChain
 
@@ -164,7 +175,7 @@ export function AudioPlayer({
     if (listenSummaryNonce === prevListenSummaryRef.current) return
     prevListenSummaryRef.current = listenSummaryNonce
     if (listenSummaryNonce === 0 || !summaryText.trim()) return
-    play('summary', true)
+    play('summary', false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listenSummaryNonce, summaryText])
 
@@ -195,10 +206,17 @@ export function AudioPlayer({
   function reportSentence(index: number) {
     lastSentenceRef.current = index
     setLiveSentence(index)
-    // No pisar el cursor del capítulo al escuchar el resumen IA.
-    if (sourceRef.current !== 'summary') {
-      progressRef.current?.(index)
+    if (sourceRef.current === 'summary') {
+      summaryProgressRef.current?.(index)
+      return
     }
+    progressRef.current?.(index)
+  }
+
+  function resumeIndexFor(src: Source): number {
+    return src === 'summary'
+      ? Math.max(0, resumeSummaryIdxRef.current)
+      : Math.max(0, resumeIdxRef.current)
   }
 
   function onPlaybackComplete() {
@@ -309,14 +327,17 @@ export function AudioPlayer({
     if (seekNonce === prevSeekRef.current) return
     prevSeekRef.current = seekNonce
     if (seekNonce === 0) return
-    // Solo saltar si ya había reproducción en curso / pausa
+    const src = sourceRef.current
+    const startAt = resumeIndexFor(src)
+    setLiveSentence(startAt)
+    // Si hay audio en curso / pausa, saltar ahí; si no, solo mueve el cursor visual.
     if (status !== 'speaking' && status !== 'paused' && status !== 'loading') {
       return
     }
-    const text = textFor(sourceRef.current)
+    const text = textFor(src)
     if (!text.trim()) return
     void speakRef.current(text, {
-      startSentenceIndex: Math.max(0, resumeIdxRef.current),
+      startSentenceIndex: startAt,
       onSentence: reportSentence,
       onComplete: onPlaybackComplete,
     })
@@ -347,18 +368,16 @@ export function AudioPlayer({
         : adaptedText
   const sentences = splitSentences(activeText)
   const sentenceCount = sentences.length
+  const idleResumeIndex =
+    source === 'summary' ? resumeSummaryIndex : resumeSentenceIndex
   const spokenIndex =
     status === 'speaking' || status === 'paused' || status === 'loading'
       ? liveSentence
-      : source !== 'summary'
-        ? resumeSentenceIndex
-        : 0
+      : idleResumeIndex
   const spokenText =
     sentences[Math.min(spokenIndex, Math.max(0, sentenceCount - 1))] ?? ''
   const canResume =
-    source !== 'summary' &&
-    resumeSentenceIndex > 0 &&
-    resumeSentenceIndex < sentenceCount
+    idleResumeIndex > 0 && idleResumeIndex < sentenceCount
   const hasSummary = Boolean(summaryText.trim())
   const chapterLabel = currentLabel?.trim() || 'Capítulo actual'
 
@@ -385,14 +404,14 @@ export function AudioPlayer({
     setSource(next)
     continueRef.current = false
     setPrompt(null)
-    setLiveSentence(fromStart ? 0 : Math.max(0, resumeIdxRef.current))
+    const startAt = fromStart ? 0 : resumeIndexFor(next)
+    setLiveSentence(startAt)
     const text =
       next === 'summary'
         ? summaryText
         : next === 'original'
           ? originalText
           : adaptedText
-    const startAt = fromStart ? 0 : Math.max(0, resumeIdxRef.current)
     void speak(text, {
       startSentenceIndex: startAt,
       onSentence: reportSentence,
@@ -503,7 +522,7 @@ export function AudioPlayer({
             disabled={!adaptedText.trim() && !hasSummary}
             title={
               canResume
-                ? `Continuar desde la oración ${resumeSentenceIndex + 1}`
+                ? `Continuar desde la oración ${idleResumeIndex + 1}`
                 : 'Reproducir'
             }
             aria-label="Reproducir"
@@ -544,11 +563,11 @@ export function AudioPlayer({
         <button
           type="button"
           className={`btn ghost audio-src${source === 'summary' ? ' active' : ''}`}
-          onClick={() => play('summary', true)}
+          onClick={() => play('summary', false)}
           disabled={!hasSummary || status === 'loading'}
           title={
             hasSummary
-              ? 'Escuchar explicación detallada (Resumen IA)'
+              ? 'Escuchar explicación detallada (Resumen IA); respeta el cursor'
               : 'Generá la explicación detallada del capítulo primero'
           }
         >
@@ -681,77 +700,83 @@ export function AudioPlayer({
         </>
       )}
 
-      {prompt === 'next' && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={declineContinue}
-        >
+      {prompt === 'next' &&
+        typeof document !== 'undefined' &&
+        createPortal(
           <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            onClick={(e) => e.stopPropagation()}
+            className="modal-backdrop modal-backdrop-portal"
+            role="presentation"
+            onClick={declineContinue}
           >
-            <h2 id={titleId}>Terminaste {where}</h2>
-            <p>
-              {nextChapterLabel
-                ? `¿Continuamos con «${nextChapterLabel}»?`
-                : '¿Continuamos con el siguiente?'}
-            </p>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={declineContinue}
-              >
-                Quedarme acá
-              </button>
-              <button
-                type="button"
-                className="btn primary"
-                onClick={acceptContinue}
-                autoFocus
-              >
-                Continuar
-              </button>
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={titleId}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id={titleId}>Terminaste {where}</h2>
+              <p>
+                {nextChapterLabel
+                  ? `¿Continuamos con «${nextChapterLabel}»?`
+                  : '¿Continuamos con el siguiente?'}
+              </p>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={declineContinue}
+                >
+                  Quedarme acá
+                </button>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={acceptContinue}
+                  autoFocus
+                >
+                  Continuar
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
-      {prompt === 'finished' && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={declineContinue}
-        >
+      {prompt === 'finished' &&
+        typeof document !== 'undefined' &&
+        createPortal(
           <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            onClick={(e) => e.stopPropagation()}
+            className="modal-backdrop modal-backdrop-portal"
+            role="presentation"
+            onClick={declineContinue}
           >
-            <h2 id={titleId}>Fin de la lectura</h2>
-            <p>
-              Terminaste {where}
-              {!hasNextChapter ? ' — no hay más páginas o capítulos.' : '.'}
-            </p>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn primary"
-                onClick={declineContinue}
-                autoFocus
-              >
-                Listo
-              </button>
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={titleId}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id={titleId}>Fin de la lectura</h2>
+              <p>
+                Terminaste {where}
+                {!hasNextChapter ? ' — no hay más páginas o capítulos.' : '.'}
+              </p>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={declineContinue}
+                  autoFocus
+                >
+                  Listo
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   )
 }

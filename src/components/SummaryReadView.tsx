@@ -6,6 +6,8 @@ interface Props {
   chapterLabel?: string
   activeSentenceIndex?: number | null
   emptyHint?: string
+  /** Colocar cursor / reanudar desde esa oración del resumen. */
+  onPlaceCursor?: (sentenceIndex: number) => void
 }
 
 /** Vista del resumen IA con oración activa al escuchar. */
@@ -14,13 +16,17 @@ export function SummaryReadView({
   chapterLabel,
   activeSentenceIndex = null,
   emptyHint = 'Generá el resumen arriba para verlo y escucharlo con el botón «Resumen IA».',
+  onPlaceCursor,
 }: Props) {
-  const activeRef = useRef<HTMLSpanElement | null>(null)
+  const activeBtnRef = useRef<HTMLButtonElement | null>(null)
+  const activeSpanRef = useRef<HTMLSpanElement | null>(null)
   const sentences = splitSentences(text)
   const hasText = Boolean(text.trim())
+  const clickable = Boolean(onPlaceCursor)
 
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    const el = activeBtnRef.current ?? activeSpanRef.current
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [activeSentenceIndex, text])
 
   if (!hasText) {
@@ -37,25 +43,58 @@ export function SummaryReadView({
           <h3>{chapterLabel}</h3>
         </header>
       ) : null}
-      <p className="chapter-summary-read-body">
+      {clickable ? (
+        <p className="chapter-summary-read-hint muted">
+          Tocá una oración para poner el cursor y seguir desde ahí.
+        </p>
+      ) : null}
+      <div className="chapter-summary-read-body">
         {sentences.map((sentence, i) => {
-          const active = activeSentenceIndex != null && i === activeSentenceIndex
+          const active =
+            activeSentenceIndex != null && i === activeSentenceIndex
+          const className = [
+            'summary-sentence',
+            active ? 'summary-sentence-active' : '',
+            clickable ? 'summary-sentence-clickable' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+          const gap = i < sentences.length - 1 ? ' ' : ''
+
+          if (!clickable) {
+            return (
+              <span
+                key={i}
+                ref={active ? activeSpanRef : undefined}
+                className={className}
+              >
+                {sentence}
+                {gap}
+              </span>
+            )
+          }
+
           return (
-            <span
+            <button
               key={i}
-              ref={active ? activeRef : undefined}
-              className={
-                active
-                  ? 'summary-sentence summary-sentence-active'
-                  : 'summary-sentence'
-              }
+              type="button"
+              ref={active ? activeBtnRef : undefined}
+              className={className}
+              onClick={() => onPlaceCursor?.(i)}
+              title={`Colocar cursor en la oración ${i + 1}`}
+              aria-current={active ? 'true' : undefined}
             >
+              {active ? (
+                <span className="reader-caret" aria-hidden="true">
+                  ▶
+                </span>
+              ) : null}
               {sentence}
-              {i < sentences.length - 1 ? ' ' : ''}
-            </span>
+              {gap}
+            </button>
           )
         })}
-      </p>
+      </div>
     </div>
   )
 }

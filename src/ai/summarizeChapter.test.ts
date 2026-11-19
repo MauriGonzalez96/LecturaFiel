@@ -37,12 +37,25 @@ vi.mock('./summaryStorage', () => ({
 }))
 
 import { textHash } from './hash'
-import { summarizeChapter } from './summarizeChapter'
+import {
+  normalizeSummaryMarkup,
+  summarizeChapter,
+} from './summarizeChapter'
 
 const sample =
   'El autor sostiene que la planificación central destruye la libertad económica. ' +
   'Repite varios ejemplos históricos y anécdotas. ' +
   'La tesis es que el control del Estado sobre precios conduce al autoritarismo.'
+
+describe('normalizeSummaryMarkup', () => {
+  it('cambia **negrita** por «comillas latinas»', () => {
+    expect(
+      normalizeSummaryMarkup(
+        'El **historicismo** ahogó el **conocimiento**.',
+      ),
+    ).toBe('El «historicismo» ahogó el «conocimiento».')
+  })
+})
 
 describe('summarizeChapter (mock Gemini)', () => {
   beforeEach(() => {
@@ -66,6 +79,22 @@ describe('summarizeChapter (mock Gemini)', () => {
   })
 
   it('llama a chat/completions de Gemini', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content:
+                  'La **planificación** central amenaza la libertad: controlar precios empuja al autoritarismo.',
+              },
+            },
+          ],
+        }),
+      })),
+    )
     const result = await summarizeChapter({
       bookId: 'test-book',
       chapterIndex: 0,
@@ -74,10 +103,12 @@ describe('summarizeChapter (mock Gemini)', () => {
       force: true,
     })
 
+    expect(result.summary).toContain('«planificación»')
+    expect(result.summary).not.toContain('**')
     expect(result.summary).toMatch(/planificación|libertad|autoritarismo/i)
     expect(result.model).toBe('gemini-3-flash-preview')
     expect(result.textHash).toBe(
-      textHash(`explicacion-neutra-v4\n${sample}`),
+      textHash(`explicacion-neutra-v5\n${sample}`),
     )
     expect(fetch).toHaveBeenCalled()
     const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]

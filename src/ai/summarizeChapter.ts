@@ -14,10 +14,21 @@ import type { ChapterSummary } from './types'
 const CHUNK_CHARS = 10_000
 const MAX_OUTPUT_TOKENS = 4096
 /** Cambia esto para invalidar cachés de resúmenes viejos. */
-const PROMPT_VERSION = 'explicacion-neutra-v4'
+const PROMPT_VERSION = 'explicacion-neutra-v5'
 
 export function chapterSummaryCacheKey(text: string): string {
   return textHash(`${PROMPT_VERSION}\n${text.replace(/\s+/g, ' ').trim()}`)
+}
+
+/**
+ * Convierte **negrita** markdown a «comillas latinas» para el narrador.
+ * No toca pares de «» ya correctos.
+ */
+export function normalizeSummaryMarkup(text: string): string {
+  return text
+    .replace(/\*\*([^*]+?)\*\*/g, '«$1»')
+    .replace(/_{2}([^_]+?)_{2}/g, '«$1»')
+    .trim()
 }
 
 const SYSTEM_PROMPT = `Redactá en español una EXPLICACIÓN DETALLADA del capítulo para audiolibro. El texto debe transmitir la esencia del autor: qué sostiene, por qué, y con qué conceptos.
@@ -27,12 +38,19 @@ Reglas de tono:
 - No uses segunda persona. Escribí como una explicación clara en tercera persona o impersonal.
 - Prosa viva y fiel, sin sonar a panfleto ni a chat informal.
 
+Marcado para narración (obligatorio):
+- NUNCA uses markdown ni asteriscos (**palabra** o *palabra*). Prohibido.
+- Las palabras clave y conceptos importantes van entre comillas latinas: «palabra».
+- Si aparece un término raro, técnico o poco habitual, escribiló así en la misma frase: «término raro», breve explicación clara, y seguí la idea sin cortar el hilo.
+  Ejemplo: …surgió el «historicismo», la idea de que la historia obedece leyes inevitables, y con ello…
+- Usá «» solo para marcar (clave o rareza + glosa breve); no abuses ni envuelvas oraciones enteras.
+
 Contenido:
 - Introducí los conceptos del autor: nombrá la idea, explicá qué significa y para qué la usa en este tramo.
 - Explicá cada concepto EN CONTEXTO: cómo encaja en el argumento, qué problema responde, qué contraste o peligro señala.
-- Si hay una lista de «conceptos difíciles» (intercambiados o en glosario), tejelos en la narración con su sentido y contexto. No los dejes como lista al final.
+- Si hay una lista de «conceptos difíciles» (intercambiados o en glosario), tejelos en la narración con «término» + sentido y contexto. No los dejes como lista al final.
 - Desarrollá el razonamiento (pasos, objeciones, matices), no solo la conclusión.
-- Conservá distinciones importantes; podés citar frases clave entre comillas si son literales.
+- Conservá distinciones importantes; podés citar frases literales del autor con comillas tipográficas “…” (distintas de «»).
 - Recortá solo repetición pura y relleno.
 - No inventes ideas que no estén en el texto ni en la lista de conceptos.
 - Sin markdown, sin listas interminables, sin cercas de código: solo prosa.
@@ -164,7 +182,7 @@ export async function summarizeChapter(opts: {
     chapterIndex: opts.chapterIndex,
     textHash: hash,
     title: opts.title,
-    summary: summary.trim(),
+    summary: normalizeSummaryMarkup(summary),
     model: config.model,
     createdAt: new Date().toISOString(),
   }

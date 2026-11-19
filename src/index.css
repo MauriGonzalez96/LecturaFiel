@@ -2191,7 +2191,7 @@ textarea {
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--surface-muted);
 }
 
 .everyday-list li span {
@@ -2359,9 +2359,23 @@ textarea {
   gap: 0.55rem;
   margin-bottom: 0.75rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid rgba(15, 122, 108, 0.22);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
+[data-theme='dark'] .chapter-summary-queue {
+  background: var(--surface);
+  border-color: rgba(45, 212, 191, 0.28);
+}
+
+[data-theme='dark'] .chapter-summary-queue-bar {
+  background: rgba(238, 243, 248, 0.12);
+}
+
+[data-theme='dark'] .chapter-summary-queue-errors {
+  color: var(--danger);
 }
 
 .chapter-summary-queue-skip {
@@ -2931,10 +2945,42 @@ textarea {
   font-size: 1.02rem;
 }
 
-.summary-sentence-active {
-  background: rgba(15, 122, 108, 0.18);
+.chapter-summary-read-hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+}
+
+.summary-sentence {
   box-decoration-break: clone;
   border-radius: 3px;
+}
+
+button.summary-sentence {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.summary-sentence-clickable:hover {
+  background: var(--hover-sentence);
+}
+
+.summary-sentence-active {
+  background: var(--active-sentence);
+  box-decoration-break: clone;
+  border-radius: 3px;
+}
+
+.summary-sentence-active .reader-caret {
+  margin-right: 0.15rem;
+  color: var(--accent-deep);
 }
 
 .chapter-summary-read {

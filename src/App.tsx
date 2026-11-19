@@ -70,6 +70,7 @@ export default function App() {
   const [cacheTick, setCacheTick] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [seekNonce, setSeekNonce] = useState(0)
+  const [summarySentenceIndex, setSummarySentenceIndex] = useState(0)
   const [listenSummaryNonce, setListenSummaryNonce] = useState(0)
   const [aiConfigTick, setAiConfigTick] = useState(0)
   const [summaryIndexTick, setSummaryIndexTick] = useState(0)
@@ -334,6 +335,15 @@ export default function App() {
     },
     [book, showDemo, setSentenceIndex],
   )
+
+  const placeSummaryCursor = useCallback((index: number) => {
+    setSummarySentenceIndex(Math.max(0, index))
+    setSeekNonce((n) => n + 1)
+  }, [])
+
+  useEffect(() => {
+    setSummarySentenceIndex(0)
+  }, [book?.id, chapterIndex, listenOverride])
 
   function goDemo() {
     if (!DEMO_ENABLED) return
@@ -852,8 +862,9 @@ export default function App() {
                     activeSentenceIndex={
                       nowPlaying?.source === 'summary'
                         ? nowPlaying.sentenceIndex
-                        : null
+                        : summarySentenceIndex
                     }
+                    onPlaceCursor={showDemo ? undefined : placeSummaryCursor}
                     emptyHint={
                       chapterSummary.status === 'loading'
                         ? 'Generando resumen… el texto aparecerá acá y podrás escucharlo con «Resumen IA».'
@@ -904,7 +915,9 @@ export default function App() {
             onAdvanceChapter={advanceChapter}
             onOpenVoices={() => setVoicesOpen(true)}
             resumeSentenceIndex={showDemo ? 0 : sentenceIndex}
+            resumeSummaryIndex={summarySentenceIndex}
             onSentenceProgress={showDemo ? undefined : saveSentenceProgress}
+            onSummarySentenceProgress={setSummarySentenceIndex}
             seekNonce={seekNonce}
             listenSummaryNonce={listenSummaryNonce}
             summaryStatus={listenOverride ? 'ready' : chapterSummary.status}
